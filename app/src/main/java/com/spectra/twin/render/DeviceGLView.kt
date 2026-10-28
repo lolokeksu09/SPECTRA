@@ -154,8 +154,10 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
                 vec3 n = normalize(nView);
                 vec3 light = normalize(vec3(-0.4,0.7,0.9));
                 float d = max(dot(n,light),0.0);
-                float s = pow(max(dot(reflect(-light,n),normalize(vView)),0.0),28.0);
-                gl_FragColor = vec4(min(vec3(1.0),uColor.rgb*(0.53+0.47*d)+vec3(0.30*s)),1.0);
+                float s = pow(max(dot(reflect(-light,n),normalize(vView)),0.0),38.0);
+                float rim = pow(1.0 - clamp(dot(n,normalize(vView)),0.0,1.0),3.0);
+                vec3 illuminated = uColor.rgb*(0.56+0.44*d) + vec3(0.27*s+0.055*rim);
+                gl_FragColor = vec4(min(vec3(1.0),illuminated),1.0);
             }
         """.trimIndent()
         val vs = shader(GLES20.GL_VERTEX_SHADER, vertex)
@@ -318,11 +320,40 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
     }
 
     private fun lens(x:Float,y:Float,r:Float) {
-        circle(x,y,-.120f,r,.16f,.17f,.18f)
-        circle(x,y,-.124f,r*.83f,.035f,.04f,.052f)
-        circle(x,y,-.128f,r*.65f,.013f,.035f,.054f)
-        circle(x,y,-.131f,r*.41f,.068f,.15f,.19f)
-        circle(x-r*.18f,y+r*.20f,-.134f,r*.12f,.25f,.49f,.58f)
+        // Extruded camera rim with an annular top face. The radius and depth
+        // are approximate rather than claims about actual sensor dimensions.
+        cameraRing(x,y,r)
+        circle(x,y,-.129f,r*.81f,.027f,.032f,.042f)
+        circle(x,y,-.133f,r*.66f,.010f,.028f,.044f)
+        circle(x,y,-.136f,r*.42f,.068f,.15f,.19f)
+        circle(x-r*.18f,y+r*.20f,-.140f,r*.12f,.25f,.49f,.58f)
+    }
+
+    private fun cameraRing(x:Float,y:Float,r:Float) {
+        val segments=48
+        val wall=FloatArray(segments*18)
+        val lip=FloatArray(segments*18)
+        for(i in 0 until segments) {
+            val aa=2.0*PI*i/segments
+            val bb=2.0*PI*(i+1)/segments
+            val ax=(r*cos(aa)).toFloat()
+            val ay=(r*sin(aa)).toFloat()
+            val bx=(r*cos(bb)).toFloat()
+            val by=(r*sin(bb)).toFloat()
+            val inner=.82f
+            val off=i*18
+            // Outer wall, with physically distinct front/back depths.
+            val w=floatArrayOf(
+                x+ax,y+ay,-.115f, x+bx,y+by,-.115f, x+bx,y+by,-.136f,
+                x+ax,y+ay,-.115f, x+bx,y+by,-.136f, x+ax,y+ay,-.136f)
+            val f=floatArrayOf(
+                x+ax,y+ay,-.136f, x+bx*inner,y+by*inner,-.136f, x+bx,y+by,-.136f,
+                x+ax,y+ay,-.136f, x+ax*inner,y+ay*inner,-.136f, x+bx*inner,y+by*inner,-.136f)
+            System.arraycopy(w,0,wall,off,18)
+            System.arraycopy(f,0,lip,off,18)
+        }
+        draw(wall,.19f,.21f,.24f)
+        draw(lip,.42f,.45f,.47f)
     }
 
 
