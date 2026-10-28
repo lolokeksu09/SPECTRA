@@ -6,7 +6,7 @@ import android.net.Uri
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
-import android.view.SurfaceView
+import android.view.TextureView
 import android.widget.FrameLayout
 import com.google.android.filament.View
 import com.google.android.filament.utils.ModelViewer
@@ -29,7 +29,9 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         init { Utils.init() }
     }
 
-    private val surface = SurfaceView(context)
+    // TextureView is composited within Compose's clipped viewer card; on some
+    // Android 16 drivers a SurfaceView can leave garbage pixels outside the model.
+    private val surface = TextureView(context).apply { isOpaque = true }
     private val viewer: ModelViewer
     private val scheduler = Choreographer.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -38,6 +40,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private var sourceKey: String? = null
     private var lastSide: DeviceView? = null
     private var active = false
+    private var frameFailures = 0
     private var attached = false
     private var disposed = false
     private var callbackScheduled = false
@@ -68,7 +71,17 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 val eyeY = radius * sin(pitch)
                 val eyeZ = focusZ + radius * c * cos(yaw)
                 viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ,0.0,1.0,0.0)
-                viewer.render(ns)
+                // Do not loop indefinitely after a renderer failure.
+                try {
+                    viewer.render(ns)
+                    frameFailures = 0
+                } catch (e: Exception) {
+                    frameFailures++
+                    if (frameFailures >= 2) {
+                        onStatus("Ошибка графики: " + e.javaClass.simpleName)
+                        pause()
+                    }
+                }
             }
             schedule()
         }
@@ -77,16 +90,18 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     init {
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         viewer = ModelViewer(surface, manipulator = null)
+        // Compatibility-first: avoid transient dynamic-resolution attachments and
+        // costly temporal effects until the Legion Y70's GPU driver is validated.
+        // The original v0.2.0 render had an uninitialised-looking strip of pixels.
         viewer.view.renderQuality = viewer.view.renderQuality.apply {
-            hdrColorBuffer = View.QualityLevel.MEDIUM
+            hdrColorBuffer = View.QualityLevel.LOW
         }
         viewer.view.dynamicResolutionOptions = viewer.view.dynamicResolutionOptions.apply {
-            enabled = true
-            quality = View.QualityLevel.MEDIUM
+            enabled = false
         }
         viewer.view.antiAliasing = View.AntiAliasing.FXAA
         viewer.view.bloomOptions = viewer.view.bloomOptions.apply { enabled = false }
-        viewer.view.ambientOcclusionOptions = viewer.view.ambientOcclusionOptions.apply { enabled = true }
+        viewer.view.ambientOcclusionOptions = viewer.view.ambientOcclusionOptions.apply { enabled = false }
         viewer.engine.lightManager.setDirection(
             viewer.engine.lightManager.getInstance(viewer.light), -.3f, -.6f, -.8f
         )
