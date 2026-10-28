@@ -32,7 +32,7 @@ jobs:
       - name: Archive debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: SPECTRA-0.1-debug
+          name: SPECTRA-0.2-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish APK to Releases for every main commit
@@ -40,8 +40,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v0.1.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk \
-            --target "$GITHUB_SHA" --title "SPECTRA 0.1 · build ${GITHUB_RUN_NUMBER}" \
+          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk \
+            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · Filament GLB · build ${GITHUB_RUN_NUMBER}" \
             --notes "Debug APK built and unit-tested at commit ${GITHUB_SHA}. Hardware validation pending." --prerelease
       - name: Publish tagged development release
         if: startsWith(github.ref, 'refs/tags/v')
