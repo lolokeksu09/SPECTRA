@@ -25,7 +25,7 @@ class SpectraViewModel(app: Application) : AndroidViewModel(app) {
     private val visualPrefs = app.getSharedPreferences("spectra-visual-v2", Context.MODE_PRIVATE)
     var importedModelUri by mutableStateOf(visualPrefs.getString("white_glb_uri", null))
         private set
-    fun setImportedModelUri(value: String) {
+    fun importModelUri(value: String) {
         importedModelUri = value
         visualPrefs.edit().putString("white_glb_uri", value).apply()
     }

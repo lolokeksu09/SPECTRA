@@ -99,7 +99,7 @@ fun SpectraApp(model: SpectraViewModel) {
             Header(latest?.deviceName ?: "Android", current.title)
             when (current) {
                 Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
-                    model.importedModelUri, model::setImportedModelUri, model::snapshot)
+                    model.importedModelUri, model::importModelUri, model::snapshot)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history)
