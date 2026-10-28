@@ -3,6 +3,8 @@ package com.spectra.twin.ui
 import android.app.Application
 import android.content.Context
 import com.spectra.twin.render.DeviceFinish
+import android.content.Context
+import com.spectra.twin.render.DeviceFinish
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +24,13 @@ import kotlinx.coroutines.withContext
 class SpectraViewModel(app: Application) : AndroidViewModel(app) {
     private val reader = TelemetryReader(app)
     private val store = SnapshotStore(app)
+    private val visualPrefs = app.getSharedPreferences("spectra-visual-v2", Context.MODE_PRIVATE)
+    var importedModelUri by mutableStateOf(visualPrefs.getString("white_glb_uri", null))
+        private set
+    fun setImportedModelUri(value: String) {
+        importedModelUri = value
+        visualPrefs.edit().putString("white_glb_uri", value).apply()
+    }
     private val preferences = app.getSharedPreferences("spectra-visual-v1", Context.MODE_PRIVATE)
     var finish by mutableStateOf(DeviceFinish.fromId(preferences.getString("finish", null)))
         private set

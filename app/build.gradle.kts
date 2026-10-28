@@ -12,8 +12,8 @@ android {
         applicationId = "com.spectra.twin"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -44,5 +44,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.3")
+    val filamentVersion = "1.77.3"
+    implementation("com.google.android.filament:filament-android:$filamentVersion")
+    implementation("com.google.android.filament:gltfio-android:$filamentVersion")
+    implementation("com.google.android.filament:filament-utils-android:$filamentVersion")
     testImplementation("junit:junit:4.13.2")
 }

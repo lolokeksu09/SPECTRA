@@ -1,6 +1,12 @@
 package com.spectra.twin.ui
 
 import android.os.Build
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.spectra.twin.render.FilamentDeviceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -92,7 +98,8 @@ fun SpectraApp(model: SpectraViewModel) {
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Header(latest?.deviceName ?: "Android", current.title)
             when (current) {
-                Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish, model::snapshot)
+                Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
+                    model.importedModelUri, model::setImportedModelUri, model::snapshot)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history)
@@ -124,8 +131,19 @@ private fun Header(device: String, title: String) {
 
 @Composable
 private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
-                       onFinishChange: (DeviceFinish) -> Unit, onSnapshot: () -> Unit) {
+                       onFinishChange: (DeviceFinish) -> Unit,
+                       importedModelUri: String?, onImport: (String) -> Unit,
+                       onSnapshot: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
+    val context = LocalContext.current
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            onImport(uri.toString())
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 22.dp),
@@ -136,11 +154,11 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 modifier = Modifier.fillMaxWidth().height(425.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
-                PhonePreview(finish, viewSide, Modifier.fillMaxSize())
+                PhonePreview(finish, viewSide, importedModelUri, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
-                    Text("LEGION Y70 · визуальный прототип", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Text("LEGION Y70 · glTF / Filament", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
                 Surface(
                     color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
@@ -191,6 +209,15 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
             }
         }
         item {
+            OutlinedButton(
+                onClick = { picker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*")) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) { Text(if (importedModelUri == null) "Импортировать свой GLB" else "Заменить GLB") }
+        }
+        item {
+            Caption("Белый корпус — 3D-ассет из архива, встроен в APK. Чёрный — упрощённая альтернативная модель. Обработка офлайн.")
+        }
+        item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 HeroMetric("БАТАРЕЯ", Metrics.percentLabel(latest?.batteryPercent),
                     Icons.Filled.BatteryFull, Modifier.weight(1f))
@@ -223,28 +250,70 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
 }
 
 @Composable
-private fun PhonePreview(finish: DeviceFinish, side: DeviceView, modifier: Modifier = Modifier) {
+private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUri: String?,
+                         modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
-    val preview = remember { mutableStateOf<DeviceGLView?>(null) }
-    AndroidView(
-        factory = { ctx -> DeviceGLView(ctx).also { preview.value = it } },
-        modifier = modifier,
-        update = { it.setFinish(finish); it.showSide(side) }
-    )
-    DisposableEffect(lifecycle, preview.value) {
-        val view = preview.value
-        if (view != null) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME -> view.onResume()
-                    Lifecycle.Event.ON_PAUSE -> view.onPause()
-                    else -> Unit
+    var modelError by remember { mutableStateOf<String?>(null) }
+    if (finish == DeviceFinish.WHITE) {
+        val preview = remember { mutableStateOf<FilamentDeviceView?>(null) }
+        Box(modifier) {
+            AndroidView(
+                factory = { ctx -> FilamentDeviceView(ctx).also { view ->
+                    view.onStatus = { modelError = it }
+                    preview.value = view
+                } },
+                modifier = Modifier.fillMaxSize(),
+                update = { view ->
+                    view.setSource(importedModelUri?.let(Uri::parse))
+                    view.showSide(side)
                 }
+            )
+            modelError?.let { message ->
+                Text(message, color = Color(0xFFFFBEBE),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.align(Alignment.Center).padding(18.dp))
             }
-            lifecycle.lifecycle.addObserver(observer)
-            if (lifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
-            onDispose { lifecycle.lifecycle.removeObserver(observer); view.onPause() }
-        } else onDispose { }
+        }
+        DisposableEffect(lifecycle, preview.value) {
+            val view = preview.value
+            if (view != null) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> view.resume()
+                        Lifecycle.Event.ON_PAUSE -> view.pause()
+                        else -> Unit
+                    }
+                }
+                lifecycle.lifecycle.addObserver(observer)
+                if (lifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.resume()
+                onDispose { lifecycle.lifecycle.removeObserver(observer); view.pause() }
+            } else onDispose {}
+        }
+    } else {
+        val preview = remember { mutableStateOf<DeviceGLView?>(null) }
+        AndroidView(
+            factory = { ctx -> DeviceGLView(ctx).also { preview.value = it } },
+            modifier = modifier,
+            update = { view ->
+                view.setFinish(DeviceFinish.BLACK)
+                view.showSide(side)
+            }
+        )
+        DisposableEffect(lifecycle, preview.value) {
+            val view = preview.value
+            if (view != null) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> view.onResume()
+                        Lifecycle.Event.ON_PAUSE -> view.onPause()
+                        else -> Unit
+                    }
+                }
+                lifecycle.lifecycle.addObserver(observer)
+                if (lifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
+                onDispose { lifecycle.lifecycle.removeObserver(observer); view.onPause() }
+            } else onDispose {}
+        }
     }
 }
 
