@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.spectra.twin.render.FilamentDeviceView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -144,12 +146,15 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
             onImport(uri.toString())
         }
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 22.dp),
+    // Keep the GLB viewer attached while scrolling. LazyColumn may recycle
+    // its TextureView and then try to reuse a destroyed native Filament engine.
+    Column(
+        modifier = Modifier.fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
-        item {
+        StableTwinItem {
             Box(
                 modifier = Modifier.fillMaxWidth().height(425.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
@@ -170,7 +175,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 }
             }
         }
-        item {
+        StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 FilterChip(
                     selected = viewSide == DeviceView.REAR,
@@ -188,7 +193,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 )
             }
         }
-        item {
+        StableTwinItem {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("ЦВЕТ КОРПУСА", style = MaterialTheme.typography.labelMedium, color = Muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -208,16 +213,16 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 }
             }
         }
-        item {
+        StableTwinItem {
             OutlinedButton(
                 onClick = { picker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*")) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             ) { Text(if (importedModelUri == null) "Импортировать свой GLB" else "Заменить GLB") }
         }
-        item {
+        StableTwinItem {
             Caption("Белый корпус — 3D-ассет из архива, встроен в APK. Чёрный — упрощённая альтернативная модель. Обработка офлайн.")
         }
-        item {
+        StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 HeroMetric("БАТАРЕЯ", Metrics.percentLabel(latest?.batteryPercent),
                     Icons.Filled.BatteryFull, Modifier.weight(1f))
@@ -225,7 +230,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     Icons.Filled.Thermostat, Modifier.weight(1f))
             }
         }
-        item {
+        StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 HeroMetric("RAM ЗАНЯТО", Metrics.percentLabel(Metrics.percent(latest?.memoryAvailableBytes,
                     latest?.memoryTotalBytes)), Icons.Filled.Memory, Modifier.weight(1f))
@@ -233,7 +238,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     Icons.Filled.DeviceThermostat, Modifier.weight(1f), compact = true)
             }
         }
-        item {
+        StableTwinItem {
             Button(
                 onClick = onSnapshot,
                 enabled = latest != null,
@@ -245,8 +250,13 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 Text("Сохранить снимок диагностики")
             }
         }
-        item { Caption("Показатели получены от Android. Отсутствующие датчики отмечаются как недоступные. Внешняя 3D-модель приближена по изображениям, не является CAD-сканом. Внутренние компоненты не отображаются.") }
+        StableTwinItem { Caption("Показатели получены от Android. Отсутствующие датчики отмечаются как недоступные. Внешняя 3D-модель приближена по изображениям, не является CAD-сканом. Внутренние компоненты не отображаются.") }
     }
+}
+
+@Composable
+private fun StableTwinItem(content: @Composable () -> Unit) {
+    content()
 }
 
 @Composable

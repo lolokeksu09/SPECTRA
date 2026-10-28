@@ -3,6 +3,7 @@ package com.spectra.twin.core
 import org.junit.Assert.*
 import org.junit.Test
 import com.spectra.twin.render.DeviceFinish
+import com.spectra.twin.render.filamentYaw
 
 class MetricsTest {
     @Test fun batteryRejectsUnknownScaleAndInvalidLevels() {
@@ -45,5 +46,10 @@ class MetricsTest {
         assertTrue(kotlin.math.abs(rear.yaw - front.yaw) > 150f)
         assertTrue(rear.pitch in -75f..75f)
         assertTrue(front.pitch in -75f..75f)
+    }
+    @Test fun glbSideBookmarksMatchAssetOrientation() {
+        assertEquals(0f, com.spectra.twin.render.DeviceView.REAR.filamentYaw(), .0001f)
+        assertEquals(kotlin.math.PI.toFloat(),
+            com.spectra.twin.render.DeviceView.FRONT.filamentYaw(), .0001f)
     }
 }

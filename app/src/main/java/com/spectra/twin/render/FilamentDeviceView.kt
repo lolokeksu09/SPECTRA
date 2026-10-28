@@ -35,7 +35,8 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     // Android 16 drivers a SurfaceView can leave garbage pixels outside the model.
     private val surface = TextureView(context).apply { isOpaque = true }
     private val viewer: ModelViewer
-    private val fillLight: Int
+    private var fillLight: Int = 0
+    private var nativeReleased = false
     private val scheduler = Choreographer.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var loadJob: Job? = null
@@ -44,6 +45,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private var lastSide: DeviceView? = null
     private var active = false
     private var frameFailures = 0
+    private var lastTouchNs = 0L
     private var attached = false
     private var disposed = false
     private var callbackScheduled = false
@@ -67,7 +69,9 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private val frameCallback = Choreographer.FrameCallback { ns ->
         callbackScheduled = false
         if (active && attached && !disposed) {
-            if (ns - lastFrame >= 33_000_000L) {
+            val interval = if (System.nanoTime() - lastTouchNs < 1_000_000_000L ||
+                    loadJob?.isActive == true) 33_000_000L else 100_000_000L
+            if (ns - lastFrame >= interval) {
                 lastFrame = ns
                 val c = cos(pitch)
                 val eyeX = radius * c * sin(yaw)
@@ -93,6 +97,25 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
 
     init {
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        // Register before ModelViewer so we release our own light BEFORE its
+        // detach listener destroys the native engine. Reverse order can crash.
+        surface.addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: android.view.View) {}
+            override fun onViewDetachedFromWindow(v: android.view.View) {
+                pause()
+                disposed = true
+                generation++
+                loadJob?.cancel()
+                scope.cancel()
+                if (!nativeReleased && fillLight != 0) {
+                    nativeReleased = true
+                    viewer.scene.removeEntity(fillLight)
+                    viewer.engine.destroyEntity(fillLight)
+                    EntityManager.get().destroy(fillLight)
+                    fillLight = 0
+                }
+            }
+        })
         viewer = ModelViewer(surface, manipulator = null)
         // Opaque TextureView + an explicitly cleared swapchain. Filament's
         // Renderer.ClearOptions defaults to clear=false; retaining uninitialised
@@ -135,6 +158,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     }
 
     private fun handleTouch(event: MotionEvent): Boolean {
+        lastTouchNs = System.nanoTime()
         pinch.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -166,7 +190,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     fun showSide(side: DeviceView) {
         if (lastSide == side) return
         lastSide = side
-        yaw = if (side == DeviceView.REAR) PI.toFloat() - .2f else -.12f
+        yaw = side.filamentYaw()
         pitch = -.10f
     }
 
@@ -237,10 +261,8 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         disposed = true
         loadJob?.cancel()
         scope.cancel()
-        // Our light is not owned by ModelViewer. Release before its TextureView
-        // detach listener destroys the engine.
-        viewer.scene.removeEntity(fillLight)
-        viewer.engine.destroyEntity(fillLight)
+        // Native cleanup already runs in the child's pre-ModelViewer listener.
+        // Never access the engine from the parent's later detach callback.
         super.onDetachedFromWindow()
     }
 }
