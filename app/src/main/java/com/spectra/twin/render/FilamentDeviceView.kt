@@ -26,7 +26,8 @@ import kotlin.math.sin
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class FilamentDeviceView(context: Context) : FrameLayout(context) {
     companion object {
-        private const val BUILTIN = "models/legion_y70_white.glb"
+        private const val BUILTIN_WHITE = ModelSources.WHITE_ASSET
+        private const val BUILTIN_BLACK = ModelSources.BLACK_ASSET
         private const val MAX_BYTES = 16 * 1024 * 1024
         init { Utils.init() }
     }
@@ -194,8 +195,8 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         pitch = -.10f
     }
 
-    fun setSource(uri: Uri?) {
-        val key = uri?.toString() ?: BUILTIN
+    fun setSource(uri: Uri?, finish: DeviceFinish) {
+        val key = uri?.toString() ?: ModelSources.builtinAsset(finish)
         if (disposed || sourceKey == key) return
         sourceKey = key
         val request = ++generation
@@ -203,7 +204,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         loadJob = scope.launch {
             try {
                 val bytes = withContext(Dispatchers.IO) {
-                    (if (uri == null) context.assets.open(BUILTIN) else
+                    (if (uri == null) context.assets.open(key) else
                         context.contentResolver.openInputStream(uri)
                             ?: throw IllegalArgumentException("Файл недоступен")).use {
                         val bytes = it.readBytes()
@@ -221,6 +222,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 throw e
             } catch (e: Exception) {
                 if (!disposed && generation == request) {
+                    sourceKey = null // allow retry after a file permissions or read failure
                     onStatus("Ошибка 3D: " + e.javaClass.simpleName)
                 }
             }

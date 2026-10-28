@@ -101,7 +101,8 @@ fun SpectraApp(model: SpectraViewModel) {
             Header(latest?.deviceName ?: "Android", current.title)
             when (current) {
                 Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
-                    model.importedModelUri, model::importModelUri, model::snapshot)
+                    model.importedModelUri, model::importModelUri,
+                    model.blackModelUri, model::importBlackModelUri, model::snapshot)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history)
@@ -135,15 +136,32 @@ private fun Header(device: String, title: String) {
 private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onFinishChange: (DeviceFinish) -> Unit,
                        importedModelUri: String?, onImport: (String) -> Unit,
+                       blackModelUri: String?, onImportBlack: (String) -> Unit,
                        onSnapshot: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     val context = LocalContext.current
+    val hasBuiltInBlack = remember(context) {
+        runCatching {
+            context.assets.list("models")?.contains("legion_y70_black.glb") == true
+        }.getOrDefault(false)
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             onImport(uri.toString())
+        }
+    }
+    val blackPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            onImportBlack(uri.toString())
+            onFinishChange(DeviceFinish.BLACK)
         }
     }
     // Keep the GLB viewer attached while scrolling. LazyColumn may recycle
@@ -159,7 +177,8 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 modifier = Modifier.fillMaxWidth().height(425.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
-                PhonePreview(finish, viewSide, importedModelUri, Modifier.fillMaxSize())
+                val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri
+                PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
@@ -200,7 +219,14 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     DeviceFinish.entries.forEach { option ->
                         FilterChip(
                             selected = finish == option,
-                            onClick = { onFinishChange(option) },
+                            onClick = {
+                                if (option == DeviceFinish.BLACK &&
+                                    blackModelUri == null && !hasBuiltInBlack) {
+                                    blackPicker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*"))
+                                } else {
+                                    onFinishChange(option)
+                                }
+                            },
                             label = { Text(option.title) },
                             leadingIcon = {
                                 Box(Modifier.size(14.dp).clip(RoundedCornerShape(50)).background(
@@ -215,12 +241,25 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         }
         StableTwinItem {
             OutlinedButton(
-                onClick = { picker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*")) },
+                onClick = {
+                    if (finish == DeviceFinish.BLACK) {
+                        blackPicker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*"))
+                    } else {
+                        picker.launch(arrayOf("model/gltf-binary", "application/octet-stream", "*/*"))
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            ) { Text(if (importedModelUri == null) "Импортировать свой GLB" else "Заменить GLB") }
+            ) {
+                Text(if (finish == DeviceFinish.BLACK) "Выбрать чёрную модель GLB" else
+                    if (importedModelUri == null) "Импортировать свой GLB" else "Заменить GLB")
+            }
         }
         StableTwinItem {
-            Caption("Белый корпус — 3D-ассет из архива, встроен в APK. Чёрный — упрощённая альтернативная модель. Обработка офлайн.")
+            Caption(
+                if (hasBuiltInBlack) "Белая и чёрная модели GLB встроены в APK. Без подключения к интернету."
+                else if (blackModelUri == null) "Белый GLB встроен в APK. Для чёрного корпуса выберите GLB из архива один раз. Выбор сохраняется, работа офлайн."
+                else "Белый GLB встроен, чёрный GLB выбран из памяти телефона. Работа офлайн."
+            )
         }
         StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -261,10 +300,10 @@ private fun StableTwinItem(content: @Composable () -> Unit) {
 
 @Composable
 private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUri: String?,
-                         modifier: Modifier = Modifier) {
+                         hasBuiltInBlack: Boolean, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
     var modelError by remember { mutableStateOf<String?>(null) }
-    if (finish == DeviceFinish.WHITE) {
+    if (finish == DeviceFinish.WHITE || hasBuiltInBlack || importedModelUri != null) {
         val preview = remember { mutableStateOf<FilamentDeviceView?>(null) }
         Box(modifier) {
             AndroidView(
@@ -274,7 +313,7 @@ private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUr
                 } },
                 modifier = Modifier.fillMaxSize(),
                 update = { view ->
-                    view.setSource(importedModelUri?.let(Uri::parse))
+                    view.setSource(importedModelUri?.let(Uri::parse), finish)
                     view.showSide(side)
                 }
             )
