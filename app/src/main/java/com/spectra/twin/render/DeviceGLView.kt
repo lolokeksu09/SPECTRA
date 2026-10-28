@@ -200,8 +200,8 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         // The external silhouette now has a rounded body and a bevelled rail.
         roundFace(0f,0f,.618f,1.318f,.085f,.075f,.11f,.13f,.16f)
         roundFace(0f,0f,.618f,1.318f,-.085f,.075f,body[0],body[1],body[2])
-        roundStrip(0f,0f,.618f,1.318f,.075f,.085f,.65f,1.35f,.094f,metal)
-        roundStrip(0f,0f,.65f,1.35f,.094f,.65f,1.35f,-.094f,metal)
+        roundStrip(0f,0f,.618f,1.318f,.085f,.65f,1.35f,.094f,.085f,metal)
+        roundStrip(0f,0f,.65f,1.35f,.094f,.65f,1.35f,-.094f,.085f,metal)
         roundStrip(0f,0f,.65f,1.35f,-.094f,.618f,1.318f,-.085f,.075f,metal)
 
         // Inset OLED glass, slim bezels and front punch-hole.
