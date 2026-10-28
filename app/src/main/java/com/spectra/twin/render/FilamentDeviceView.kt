@@ -67,7 +67,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 val eyeX = radius * c * sin(yaw)
                 val eyeY = radius * sin(pitch)
                 val eyeZ = focusZ + radius * c * cos(yaw)
-                viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ)
+                viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ,0.0,1.0,0.0)
                 viewer.render(ns)
             }
             schedule()
@@ -77,7 +77,6 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     init {
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         viewer = ModelViewer(surface, manipulator = null)
-        viewer.autoPlayAnimations = false
         viewer.view.renderQuality = viewer.view.renderQuality.apply {
             hdrColorBuffer = View.QualityLevel.MEDIUM
         }
