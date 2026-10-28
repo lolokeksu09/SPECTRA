@@ -2,6 +2,13 @@ package com.spectra.twin.render
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.opengl.GLUtils
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
@@ -83,6 +90,14 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
     private var colorHandle = 0
     private var normalHandle = 0
     private var modelViewHandle = 0
+    private var decalProgram = 0
+    private var decalPos = 0
+    private var decalUv = 0
+    private var decalMvp = 0
+    private var decalSampler = 0
+    private var frontTex = 0
+    private var whiteTex = 0
+    private var blackTex = 0
     private val mv = FloatArray(16)
     private var matrixHandle = 0
     private val view = FloatArray(16)
@@ -94,6 +109,8 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(unused: javax.microedition.khronos.opengles.GL10?, config: javax.microedition.khronos.egl.EGLConfig?) {
         GLES20.glClearColor(0.015f, 0.019f, 0.032f, 1f)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         val vertex = """
             uniform mat4 uMvp;
             uniform mat4 uModelView;
@@ -136,6 +153,14 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         colorHandle = GLES20.glGetUniformLocation(program, "uColor")
         normalHandle = GLES20.glGetAttribLocation(program, "aNormal")
         modelViewHandle = GLES20.glGetUniformLocation(program, "uModelView")
+        decalProgram = makeDecalProgram()
+        decalPos = GLES20.glGetAttribLocation(decalProgram, "aPos")
+        decalUv = GLES20.glGetAttribLocation(decalProgram, "aUv")
+        decalMvp = GLES20.glGetUniformLocation(decalProgram, "uMvp")
+        decalSampler = GLES20.glGetUniformLocation(decalProgram, "uTex")
+        frontTex = uploadBitmap(frontArt())
+        whiteTex = uploadBitmap(backArt(true))
+        blackTex = uploadBitmap(backArt(false))
         matrixHandle = GLES20.glGetUniformLocation(program, "uMvp")
     }
 
@@ -201,6 +226,11 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         side(floatArrayOf(.658f,.57f,-.037f,.658f,.84f,-.037f,.658f,.84f,.040f,.658f,.57f,.040f),
             .59f,.62f,.66f)
 
+        // Screen art and low-contrast rear logo: device-specific cues, not a
+        // substitute for a measured, photorealistic manufacturing texture.
+        decal(frontTex,-.589f,-1.281f,.098f,.589f,1.281f,false)
+        decal(if(white) whiteTex else blackTex,-.605f,-1.31f,-.089f,.605f,1.31f,true)
+
     }
 
 
@@ -261,6 +291,127 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         circle(x,y,-.128f,r*.65f,.013f,.035f,.054f)
         circle(x,y,-.131f,r*.41f,.068f,.15f,.19f)
         circle(x-r*.18f,y+r*.20f,-.134f,r*.12f,.25f,.49f,.58f)
+    }
+
+
+    private fun makeDecalProgram():Int {
+        val vertex = """
+            uniform mat4 uMvp;
+            attribute vec3 aPos;
+            attribute vec2 aUv;
+            varying vec2 vUv;
+            void main() { vUv = aUv; gl_Position = uMvp * vec4(aPos,1.0); }
+        """.trimIndent()
+        val fragment = """
+            precision mediump float;
+            varying vec2 vUv;
+            uniform sampler2D uTex;
+            void main() { gl_FragColor = texture2D(uTex,vUv); }
+        """.trimIndent()
+        val v=shader(GLES20.GL_VERTEX_SHADER,vertex)
+        val f=shader(GLES20.GL_FRAGMENT_SHADER,fragment)
+        val result=GLES20.glCreateProgram()
+        GLES20.glAttachShader(result,v)
+        GLES20.glAttachShader(result,f)
+        GLES20.glLinkProgram(result)
+        val ok=IntArray(1)
+        GLES20.glGetProgramiv(result,GLES20.GL_LINK_STATUS,ok,0)
+        check(ok[0]==GLES20.GL_TRUE) { "SPECTRA decal shader link: " + GLES20.glGetProgramInfoLog(result) }
+        GLES20.glDeleteShader(v)
+        GLES20.glDeleteShader(f)
+        return result
+    }
+
+    private fun uploadBitmap(bitmap:Bitmap):Int {
+        val ids=IntArray(1)
+        GLES20.glGenTextures(1,ids,0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,ids[0])
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE)
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,bitmap,0)
+        bitmap.recycle()
+        return ids[0]
+    }
+
+    private fun decal(tex:Int,x1:Float,y1:Float,z:Float,x2:Float,y2:Float,back:Boolean) {
+        // Flip U for the rear surface: a viewer facing the rear sees mirrored X.
+        val u0=if(back) 1f else 0f
+        val u1=if(back) 0f else 1f
+        val a=floatArrayOf(
+            x1,y1,z,u0,1f,  x2,y1,z,u1,1f,  x1,y2,z,u0,0f,
+            x1,y2,z,u0,0f,  x2,y1,z,u1,1f,  x2,y2,z,u1,0f)
+        val fb=ByteBuffer.allocateDirect(a.size*4).order(ByteOrder.nativeOrder())
+            .asFloatBuffer().apply { put(a);position(0) }
+        GLES20.glUseProgram(decalProgram)
+        GLES20.glUniformMatrix4fv(decalMvp,1,false,mvp,0)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,tex)
+        GLES20.glUniform1i(decalSampler,0)
+        GLES20.glDepthMask(false)
+        fb.position(0)
+        GLES20.glEnableVertexAttribArray(decalPos)
+        GLES20.glVertexAttribPointer(decalPos,3,GLES20.GL_FLOAT,false,20,fb)
+        fb.position(3)
+        GLES20.glEnableVertexAttribArray(decalUv)
+        GLES20.glVertexAttribPointer(decalUv,2,GLES20.GL_FLOAT,false,20,fb)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,6)
+        GLES20.glDisableVertexAttribArray(decalUv)
+        GLES20.glDisableVertexAttribArray(decalPos)
+        GLES20.glDepthMask(true)
+        GLES20.glUseProgram(program)
+        GLES20.glUniformMatrix4fv(matrixHandle,1,false,mvp,0)
+        GLES20.glUniformMatrix4fv(modelViewHandle,1,false,mv,0)
+    }
+
+    private fun backArt(white:Boolean):Bitmap {
+        val image=Bitmap.createBitmap(512,1024,Bitmap.Config.ARGB_8888)
+        val c=Canvas(image)
+        val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color=if(white) Color.argb(95,82,85,92) else Color.argb(115,148,150,152)
+        paint.textAlign=Paint.Align.CENTER
+        paint.isFakeBoldText=true
+        paint.textSize=95f
+        c.save()
+        c.translate(256f,552f)
+        c.rotate(-90f)
+        c.drawText("LEGION",0f,0f,paint)
+        c.restore()
+        paint.isFakeBoldText=false
+        paint.textSize=25f
+        c.drawText("Lenovo",256f,913f,paint)
+        return image
+    }
+
+    private fun frontArt():Bitmap {
+        val image=Bitmap.createBitmap(512,1024,Bitmap.Config.ARGB_8888)
+        val c=Canvas(image)
+        val p=Paint(Paint.ANTI_ALIAS_FLAG)
+        p.shader=LinearGradient(0f,0f,512f,1024f,
+            intArrayOf(Color.rgb(3,9,22),Color.rgb(7,20,39),Color.rgb(3,5,14)),
+            null,Shader.TileMode.CLAMP)
+        c.drawRect(0f,0f,512f,1024f,p)
+        p.shader=null
+        p.strokeWidth=2f
+        for(i in 0..13) {
+            val y=125f+i*43f
+            p.color=Color.argb(32,38,148,210)
+            c.drawLine(23f,y,125f+(i%4)*24f,y,p)
+            c.drawLine(370f,y+11f,489f,y+11f,p)
+        }
+        p.textAlign=Paint.Align.CENTER
+        p.isFakeBoldText=true
+        p.textSize=82f
+        p.setShadowLayer(26f,0f,0f,Color.rgb(23,116,227))
+        p.color=Color.rgb(133,204,248)
+        c.drawText("LEGION",256f,570f,p)
+        p.clearShadowLayer()
+        p.isFakeBoldText=false
+        p.textSize=20f
+        p.color=Color.rgb(91,130,153)
+        c.drawText("DIGITAL TWIN",256f,609f,p)
+        return image
     }
 
     private fun quad(x1:Float,y1:Float,z1:Float,x2:Float,y2:Float,z2:Float,r:Float,g:Float,b:Float) {
