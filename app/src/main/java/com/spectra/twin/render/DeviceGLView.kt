@@ -14,6 +14,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.GestureDetector
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -36,6 +37,16 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
         if (scene.finish == value) return
         scene.finish = value
         requestRender()
+    }
+
+    private var lastSide: DeviceView? = null
+    fun showSide(side: DeviceView) {
+        if (lastSide != side) {
+            lastSide = side
+            scene.yaw = side.yaw
+            scene.pitch = side.pitch
+            requestRender()
+        }
     }
 
     private var lastX = 0f
@@ -80,11 +91,20 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
     }
 }
 
+/** Immutable CPU-side mesh; generated only when the appearance changes. */
+private data class DrawBatch(
+    val vertices: FloatBuffer,
+    val vertexCount: Int,
+    val r: Float, val g: Float, val b: Float
+)
+
 private class PhoneRenderer : GLSurfaceView.Renderer {
     @Volatile var finish = DeviceFinish.WHITE
     @Volatile var yaw = 155f
     @Volatile var pitch = -13f
-    @Volatile var distance = 4.7f
+    @Volatile var distance = 4.55f
+    private val meshCache = ArrayList<DrawBatch>(48)
+    private var cachedFinish: DeviceFinish? = null
     private var program = 0
     private var posHandle = 0
     private var colorHandle = 0
@@ -158,6 +178,8 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         decalUv = GLES20.glGetAttribLocation(decalProgram, "aUv")
         decalMvp = GLES20.glGetUniformLocation(decalProgram, "uMvp")
         decalSampler = GLES20.glGetUniformLocation(decalProgram, "uTex")
+        cachedFinish = null
+        meshCache.clear()
         frontTex = uploadBitmap(frontArt())
         whiteTex = uploadBitmap(backArt(true))
         blackTex = uploadBitmap(backArt(false))
@@ -192,7 +214,23 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         GLES20.glUniformMatrix4fv(matrixHandle, 1, false, mvp, 0)
         GLES20.glUniformMatrix4fv(modelViewHandle, 1, false, mv, 0)
 
-        val white = finish == DeviceFinish.WHITE
+        val appearance = finish
+        if (cachedFinish != appearance) {
+            meshCache.clear()
+            generateGeometry(appearance)
+            cachedFinish = appearance
+        }
+        meshCache.forEach(::renderBatch)
+
+        // The two surface textures are lightweight; all underlying solid geometry
+        // is retained between gestures and only regenerated for a finish change.
+        decal(frontTex,-.589f,-1.281f,.098f,.589f,1.281f,false)
+        decal(if(appearance == DeviceFinish.WHITE) whiteTex else blackTex,
+              -.605f,-1.31f,-.089f,.605f,1.31f,true)
+    }
+
+    private fun generateGeometry(appearance: DeviceFinish) {
+        val white = appearance == DeviceFinish.WHITE
         val body = if (white) floatArrayOf(.85f,.88f,.91f) else floatArrayOf(.10f,.11f,.12f)
         val metal = if (white) floatArrayOf(.64f,.69f,.73f) else floatArrayOf(.25f,.27f,.30f)
         val cam = if (white) floatArrayOf(.69f,.72f,.76f) else floatArrayOf(.16f,.18f,.20f)
@@ -226,13 +264,7 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         side(floatArrayOf(.658f,.57f,-.037f,.658f,.84f,-.037f,.658f,.84f,.040f,.658f,.57f,.040f),
             .59f,.62f,.66f)
 
-        // Screen art and low-contrast rear logo: device-specific cues, not a
-        // substitute for a measured, photorealistic manufacturing texture.
-        decal(frontTex,-.589f,-1.281f,.098f,.589f,1.281f,false)
-        decal(if(white) whiteTex else blackTex,-.605f,-1.31f,-.089f,.605f,1.31f,true)
-
     }
-
 
     private fun outline(cx:Float,cy:Float,hw:Float,hh:Float,rad:Float):FloatArray {
         val coords = FloatArray(4 * 13 * 2)
@@ -439,7 +471,7 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         draw(points,r,g,b)
     }
     private fun draw(vertices:FloatArray,r:Float,g:Float,b:Float) {
-        // Interleaved position + face normal; directional light reacts to rotation.
+        // CPU-side geometry generation is performed once per finish, not every frame.
         val interleaved=FloatArray(vertices.size*2)
         for(i in vertices.indices step 9) {
             val ax=vertices[i];val ay=vertices[i+1];val az=vertices[i+2]
@@ -464,13 +496,19 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
             .order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
                 put(interleaved);position(0)
             }
-        GLES20.glUniform4f(colorHandle,r,g,b,1f)
+        meshCache.add(DrawBatch(buffer,vertices.size/3,r,g,b))
+    }
+
+    private fun renderBatch(batch: DrawBatch) {
+        val buffer=batch.vertices
+        buffer.position(0)
+        GLES20.glUniform4f(colorHandle,batch.r,batch.g,batch.b,1f)
         GLES20.glEnableVertexAttribArray(posHandle)
         GLES20.glEnableVertexAttribArray(normalHandle)
         GLES20.glVertexAttribPointer(posHandle,3,GLES20.GL_FLOAT,false,24,buffer)
         buffer.position(3)
         GLES20.glVertexAttribPointer(normalHandle,3,GLES20.GL_FLOAT,false,24,buffer)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices.size/3)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,batch.vertexCount)
         GLES20.glDisableVertexAttribArray(normalHandle)
         GLES20.glDisableVertexAttribArray(posHandle)
     }

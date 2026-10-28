@@ -39,4 +39,11 @@ class MetricsTest {
         assertEquals(DeviceFinish.WHITE, DeviceFinish.fromId("white"))
         assertEquals(DeviceFinish.BLACK, DeviceFinish.fromId("black"))
     }
+    @Test fun cameraBookmarksFaceOppositeSides() {
+        val rear = com.spectra.twin.render.DeviceView.REAR
+        val front = com.spectra.twin.render.DeviceView.FRONT
+        assertTrue(kotlin.math.abs(rear.yaw - front.yaw) > 150f)
+        assertTrue(rear.pitch in -75f..75f)
+        assertTrue(front.pitch in -75f..75f)
+    }
 }

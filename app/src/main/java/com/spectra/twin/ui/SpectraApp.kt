@@ -26,6 +26,7 @@ import com.spectra.twin.core.Metrics
 import com.spectra.twin.core.TelemetrySnapshot
 import com.spectra.twin.render.DeviceGLView
 import com.spectra.twin.render.DeviceFinish
+import com.spectra.twin.render.DeviceView
 import androidx.compose.ui.platform.testTag
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -124,6 +125,7 @@ private fun Header(device: String, title: String) {
 @Composable
 private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onFinishChange: (DeviceFinish) -> Unit, onSnapshot: () -> Unit) {
+    var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 22.dp),
@@ -131,10 +133,10 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     ) {
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().height(355.dp)
+                modifier = Modifier.fillMaxWidth().height(425.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
-                PhonePreview(finish, Modifier.fillMaxSize())
+                PhonePreview(finish, viewSide, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
@@ -148,6 +150,24 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
                 }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = viewSide == DeviceView.REAR,
+                    onClick = { viewSide = DeviceView.REAR },
+                    label = { Text("Сзади") },
+                    leadingIcon = { Icon(Icons.Filled.CameraAlt, contentDescription = null, Modifier.size(16.dp)) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("view_rear")
+                )
+                FilterChip(
+                    selected = viewSide == DeviceView.FRONT,
+                    onClick = { viewSide = DeviceView.FRONT },
+                    label = { Text("Спереди") },
+                    leadingIcon = { Icon(Icons.Filled.Smartphone, contentDescription = null, Modifier.size(16.dp)) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("view_front")
+                )
             }
         }
         item {
@@ -203,13 +223,13 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
 }
 
 @Composable
-private fun PhonePreview(finish: DeviceFinish, modifier: Modifier = Modifier) {
+private fun PhonePreview(finish: DeviceFinish, side: DeviceView, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
     val preview = remember { mutableStateOf<DeviceGLView?>(null) }
     AndroidView(
         factory = { ctx -> DeviceGLView(ctx).also { preview.value = it } },
         modifier = modifier,
-        update = { it.setFinish(finish) }
+        update = { it.setFinish(finish); it.showSide(side) }
     )
     DisposableEffect(lifecycle, preview.value) {
         val view = preview.value
