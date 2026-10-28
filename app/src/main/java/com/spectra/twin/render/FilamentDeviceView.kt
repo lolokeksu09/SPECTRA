@@ -70,9 +70,10 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 val eyeX = radius * c * sin(yaw)
                 val eyeY = radius * sin(pitch)
                 val eyeZ = focusZ + radius * c * cos(yaw)
-                viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ,0.0,1.0,0.0)
-                // Do not loop indefinitely after a renderer failure.
+                // Camera updates and rendering both touch Filament native state.
+                // Keep them behind the same recoverable error boundary.
                 try {
+                    viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ,0.0,1.0,0.0)
                     viewer.render(ns)
                     frameFailures = 0
                 } catch (e: Exception) {
@@ -90,6 +91,16 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     init {
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         viewer = ModelViewer(surface, manipulator = null)
+        // Opaque TextureView + an explicitly cleared swapchain. Filament's
+        // Renderer.ClearOptions defaults to clear=false; retaining uninitialised
+        // swapchain pixels can expose noisy strips on some Android GPU drivers.
+        // Clearing is independent of dynamic-resolution / post-processing.
+        viewer.renderer.clearOptions = viewer.renderer.clearOptions.apply {
+            clear = true
+            discard = true
+            clearColor = doubleArrayOf(0.012, 0.016, 0.024, 1.0)
+        }
+        viewer.scene.skybox = null
         // Compatibility-first: avoid transient dynamic-resolution attachments and
         // costly temporal effects until the Legion Y70's GPU driver is validated.
         // The original v0.2.0 render had an uninitialised-looking strip of pixels.
