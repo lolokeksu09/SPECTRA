@@ -110,10 +110,9 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         // Filament upstream documents corrupted/tearing pixels on Android
         // OpenGL composition; a full post-processing bypass avoids this path.
         // This sacrifices FXAA/tone mapping until validated on the Legion Y70.
-        viewer.autoPlayAnimations = false
         viewer.view.blendMode = View.BlendMode.OPAQUE
         viewer.view.isPostProcessingEnabled = false
-        viewer.view.isShadowingEnabled = false
+        viewer.view.setShadowingEnabled(false)
         viewer.view.dynamicResolutionOptions = viewer.view.dynamicResolutionOptions.apply {
             enabled = false
         }
