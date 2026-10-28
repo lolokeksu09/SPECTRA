@@ -1,0 +1,377 @@
+package com.spectra.twin.ui
+
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.spectra.twin.core.Metrics
+import com.spectra.twin.core.TelemetrySnapshot
+import com.spectra.twin.render.DeviceGLView
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private enum class Page(val title: String) {
+    TWIN("3D-модель"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История")
+}
+
+@Composable
+fun SpectraApp(model: SpectraViewModel) {
+    var current by remember { mutableStateOf(Page.TWIN) }
+    val latest = model.latest
+    val snackbar = remember { SnackbarHostState() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, model) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> model.start()
+                Lifecycle.Event.ON_PAUSE -> model.stop()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) model.start()
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); model.stop() }
+    }
+    LaunchedEffect(model.message) {
+        model.message?.let { snackbar.showSnackbar(it); model.clearMessage() }
+    }
+
+    Scaffold(
+        containerColor = Night,
+        snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            NavigationBar(containerColor = Panel, tonalElevation = 0.dp) {
+                Page.entries.forEach { page ->
+                    val icon = when (page) {
+                        Page.TWIN -> Icons.Filled.ViewInAr
+                        Page.SYSTEM -> Icons.Filled.Memory
+                        Page.THERMAL -> Icons.Filled.Thermostat
+                        Page.HISTORY -> Icons.Filled.History
+                    }
+                    NavigationBarItem(
+                        selected = current == page,
+                        onClick = { current = page },
+                        label = { Text(page.title, maxLines = 1) },
+                        icon = { Icon(icon, contentDescription = page.title) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Night,
+                            selectedTextColor = Ice,
+                            indicatorColor = Ice,
+                            unselectedIconColor = Muted,
+                            unselectedTextColor = Muted
+                        )
+                    )
+                }
+            }
+        },
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Header(latest?.deviceName ?: "Android", current.title)
+            when (current) {
+                Page.TWIN -> TwinScreen(latest, model::snapshot)
+                Page.SYSTEM -> SystemScreen(latest)
+                Page.THERMAL -> ThermalScreen(latest)
+                Page.HISTORY -> HistoryScreen(model.history)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Header(device: String, title: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text("S P E C T R A", style = MaterialTheme.typography.titleMedium,
+                color = Ice, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text(title, style = MaterialTheme.typography.labelMedium, color = Muted)
+        }
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 185.dp)) {
+            Text(device, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurface, overflow = TextOverflow.Ellipsis)
+            Text("ANDROID ${Build.VERSION.RELEASE}", color = Muted,
+                style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun TwinScreen(latest: TelemetrySnapshot?, onSnapshot: () -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp)
+    ) {
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(355.dp)
+                    .clip(RoundedCornerShape(26.dp)).background(Panel)
+            ) {
+                PhonePreview(Modifier.fillMaxSize())
+                Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
+                    Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
+                    Text("Прототип 3D-корпуса", color = Muted, style = MaterialTheme.typography.labelSmall)
+                }
+                Surface(
+                    color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp)
+                ) {
+                    Text("Поверните жестом · масштаб — двумя пальцами",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                HeroMetric("БАТАРЕЯ", Metrics.percentLabel(latest?.batteryPercent),
+                    Icons.Filled.BatteryFull, Modifier.weight(1f))
+                HeroMetric("ТЕМПЕРАТУРА", Metrics.temperature(latest?.batteryCelsius),
+                    Icons.Filled.Thermostat, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                HeroMetric("RAM ЗАНЯТО", Metrics.percentLabel(Metrics.percent(latest?.memoryAvailableBytes,
+                    latest?.memoryTotalBytes)), Icons.Filled.Memory, Modifier.weight(1f))
+                HeroMetric("ТЕПЛОВОЙ СТАТУС", Metrics.thermalStatus(latest?.thermalStatus),
+                    Icons.Filled.DeviceThermostat, Modifier.weight(1f), compact = true)
+            }
+        }
+        item {
+            Button(
+                onClick = onSnapshot,
+                enabled = latest != null,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(15.dp)
+            ) {
+                Icon(Icons.Filled.Save, contentDescription = null)
+                Spacer(Modifier.width(9.dp))
+                Text("Сохранить снимок диагностики")
+            }
+        }
+        item { Caption("Показатели получены от Android. Отсутствующие датчики отмечаются как недоступные. 3D-модель не отображает реальную геометрию внутренних компонентов.") }
+    }
+}
+
+@Composable
+private fun PhonePreview(modifier: Modifier = Modifier) {
+    val lifecycle = LocalLifecycleOwner.current
+    val preview = remember { mutableStateOf<DeviceGLView?>(null) }
+    AndroidView(
+        factory = { ctx -> DeviceGLView(ctx).also { preview.value = it } },
+        modifier = modifier,
+    )
+    DisposableEffect(lifecycle, preview.value) {
+        val view = preview.value
+        if (view != null) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> view.onResume()
+                    Lifecycle.Event.ON_PAUSE -> view.onPause()
+                    else -> Unit
+                }
+            }
+            lifecycle.lifecycle.addObserver(observer)
+            if (lifecycle.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view.onResume()
+            onDispose { lifecycle.lifecycle.removeObserver(observer); view.onPause() }
+        } else onDispose { }
+    }
+}
+
+@Composable
+private fun HeroMetric(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
+                       modifier: Modifier = Modifier, compact: Boolean = false) {
+    Card(modifier = modifier.height(108.dp), colors = CardDefaults.cardColors(containerColor = Panel),
+        shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(15.dp),
+            verticalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(icon, null, modifier = Modifier.size(15.dp), tint = Ice)
+                Text(label, color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
+            }
+            Text(value, style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, color = Color.White,
+            fontWeight = FontWeight.SemiBold)
+        subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Muted) }
+    }
+}
+
+@Composable
+private fun DataRow(label: String, value: String, detail: String? = null) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = Muted, style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(14.dp))
+            Text(value, color = Color(0xFFEAF2F8), fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium)
+        }
+        detail?.let { Text(it, color = Muted, style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 3.dp)) }
+    }
+    HorizontalDivider(color = PanelUp)
+}
+
+@Composable
+private fun PanelCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = Panel),
+        shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(18.dp), content = content)
+    }
+}
+
+@Composable
+private fun Caption(text: String) {
+    Text(text, color = Muted, style = MaterialTheme.typography.bodySmall,
+        lineHeight = 18.sp, modifier = Modifier.padding(horizontal = 4.dp))
+}
+
+@Composable
+private fun SystemScreen(latest: TelemetrySnapshot?) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { SectionTitle("Системная телеметрия", "Обновление примерно каждые 2,5 секунды во время просмотра") }
+        item {
+            PanelCard {
+                Text("АККУМУЛЯТОР", color = Ice, style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                DataRow("Заряд", Metrics.percentLabel(latest?.batteryPercent))
+                DataRow("Состояние", latest?.batteryHealth ?: "Недоступно")
+                DataRow("Зарядка", when (latest?.isCharging) { true -> "Подключена"; false -> "Не заряжается"; null -> "Недоступно" })
+                DataRow("Температура батареи", Metrics.temperature(latest?.batteryCelsius))
+                DataRow("Напряжение", Metrics.voltage(latest?.batteryVoltageMv))
+                DataRow("Ток батареи", Metrics.current(latest?.batteryCurrentMa), "Знак тока зависит от реализации прошивки")
+            }
+        }
+        item {
+            PanelCard {
+                Text("ПАМЯТЬ И ДИСПЛЕЙ", color = Ice, style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                DataRow("RAM всего", Metrics.size(latest?.memoryTotalBytes))
+                DataRow("RAM доступно", Metrics.size(latest?.memoryAvailableBytes))
+                DataRow("RAM занято", Metrics.percentLabel(Metrics.percent(latest?.memoryAvailableBytes, latest?.memoryTotalBytes)))
+                DataRow("Раздел данных всего", Metrics.size(latest?.storageTotalBytes))
+                DataRow("Раздел данных доступно", Metrics.size(latest?.storageAvailableBytes))
+                DataRow("Частота дисплея", Metrics.hz(latest?.refreshRateHz), "Не равна частоте кадров в игре")
+            }
+        }
+        item { Caption("Не показываем CPU/GPU температуру и FPS других приложений: обычные Android API не гарантируют эти данные. Свободная RAM учитывает системные кэши.") }
+    }
+}
+
+@Composable
+private fun ThermalScreen(latest: TelemetrySnapshot?) {
+    val thermal = latest?.thermalStatus
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { SectionTitle("Тепловая система", "Официальный статус Android Thermal API") }
+        item {
+            PanelCard {
+                Icon(Icons.Filled.Thermostat, contentDescription = null, tint = Ice,
+                    modifier = Modifier.size(36.dp))
+                Spacer(Modifier.height(18.dp))
+                Text(Metrics.thermalStatus(thermal), color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(9.dp))
+                Text("Тепловая серьёзность: ${thermal?.toString() ?: "—"} / 6",
+                    style = MaterialTheme.typography.bodyMedium, color = Muted)
+                Spacer(Modifier.height(15.dp))
+                if (thermal != null) {
+                    LinearProgressIndicator(
+                        progress = { (thermal.coerceIn(0, 6) / 6f) },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(8.dp)),
+                        color = if (thermal >= 3) MaterialTheme.colorScheme.error else Ice,
+                        trackColor = PanelUp
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Температура батареи: ${Metrics.temperature(latest?.batteryCelsius)}",
+                    color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        item {
+            PanelCard {
+                Text("Как читать показатели", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                DataRow("0–1", "Норма / лёгкий нагрев")
+                DataRow("2–3", "Умеренный / сильный")
+                DataRow("4–6", "Критический и выше")
+            }
+        }
+        item { Caption("Значение 0–6 — не градусы и не прямое измерение CPU. Система оценивает общий тепловой режим. Визуальная тепловая карта компонентов появится только при наличии подтверждённых датчиков.") }
+    }
+}
+
+@Composable
+private fun HistoryScreen(items: List<TelemetrySnapshot>) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { SectionTitle("Снимки диагностики", "Локально на устройстве · до 100 последних снимков") }
+        if (items.isEmpty()) {
+            item {
+                PanelCard {
+                    Icon(Icons.Filled.History, contentDescription = null, tint = Ice,
+                        modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text("История пока пуста", color = Color.White,
+                        style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Откройте вкладку 3D-модель и нажмите «Сохранить снимок диагностики».",
+                        color = Muted, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        } else {
+            itemsIndexed(items, key = { index, snapshot -> "${snapshot.atMillis}-$index" }) { _, snapshot ->
+                PanelCard {
+                    Text(SimpleDateFormat("dd.MM.yyyy · HH:mm:ss", Locale("ru"))
+                        .format(Date(snapshot.atMillis)), color = Ice,
+                        style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(9.dp))
+                    DataRow("Батарея", Metrics.percentLabel(snapshot.batteryPercent))
+                    DataRow("Температура батареи", Metrics.temperature(snapshot.batteryCelsius))
+                    DataRow("Тепловой статус", Metrics.thermalStatus(snapshot.thermalStatus))
+                    DataRow("RAM занято", Metrics.percentLabel(Metrics.percent(
+                        snapshot.memoryAvailableBytes, snapshot.memoryTotalBytes)))
+                }
+            }
+        }
+        item { Caption("Снимки записываются только по нажатию кнопки. Удаление данных приложения очищает историю.") }
+    }
+}
