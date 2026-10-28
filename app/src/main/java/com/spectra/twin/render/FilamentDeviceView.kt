@@ -9,6 +9,8 @@ import android.view.ScaleGestureDetector
 import android.view.TextureView
 import android.widget.FrameLayout
 import com.google.android.filament.View
+import com.google.android.filament.EntityManager
+import com.google.android.filament.LightManager
 import com.google.android.filament.utils.ModelViewer
 import com.google.android.filament.utils.Utils
 import kotlinx.coroutines.*
@@ -33,6 +35,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     // Android 16 drivers a SurfaceView can leave garbage pixels outside the model.
     private val surface = TextureView(context).apply { isOpaque = true }
     private val viewer: ModelViewer
+    private val fillLight: Int
     private val scheduler = Choreographer.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var loadJob: Job? = null
@@ -97,25 +100,37 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         // Clearing is independent of dynamic-resolution / post-processing.
         viewer.renderer.clearOptions = viewer.renderer.clearOptions.apply {
             clear = true
-            discard = true
+            // Some Android drivers expose invalidated pixels after discard.
+            discard = false
             clearColor = doubleArrayOf(0.012, 0.016, 0.024, 1.0)
         }
         viewer.scene.skybox = null
-        // Compatibility-first: avoid transient dynamic-resolution attachments and
-        // costly temporal effects until the Legion Y70's GPU driver is validated.
-        // The original v0.2.0 render had an uninitialised-looking strip of pixels.
-        viewer.view.renderQuality = viewer.view.renderQuality.apply {
-            hdrColorBuffer = View.QualityLevel.LOW
-        }
+        // GPU compatibility: disabling only bloom, AO, and dynamic scaling
+        // still leaves Filament's intermediate post-processing buffers active.
+        // Filament upstream documents corrupted/tearing pixels on Android
+        // OpenGL composition; a full post-processing bypass avoids this path.
+        // This sacrifices FXAA/tone mapping until validated on the Legion Y70.
+        viewer.autoPlayAnimations = false
+        viewer.view.blendMode = View.BlendMode.OPAQUE
+        viewer.view.isPostProcessingEnabled = false
+        viewer.view.isShadowingEnabled = false
         viewer.view.dynamicResolutionOptions = viewer.view.dynamicResolutionOptions.apply {
             enabled = false
         }
-        viewer.view.antiAliasing = View.AntiAliasing.FXAA
+        viewer.view.antiAliasing = View.AntiAliasing.NONE
         viewer.view.bloomOptions = viewer.view.bloomOptions.apply { enabled = false }
         viewer.view.ambientOcclusionOptions = viewer.view.ambientOcclusionOptions.apply { enabled = false }
         viewer.engine.lightManager.setDirection(
             viewer.engine.lightManager.getInstance(viewer.light), -.3f, -.6f, -.8f
         )
+        // Back face was almost black: the default sun lights only one side.
+        fillLight = EntityManager.get().create()
+        LightManager.Builder(LightManager.Type.DIRECTIONAL)
+            .direction(.25f, -.45f, .85f)
+            .intensity(42_000f)
+            .castShadows(false)
+            .build(viewer.engine, fillLight)
+        viewer.scene.addEntity(fillLight)
         surface.setOnTouchListener { _, event -> handleTouch(event) }
         contentDescription = "3D-модель Lenovo Legion Y70. Поворот одним пальцем, масштаб двумя."
     }
@@ -223,7 +238,10 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         disposed = true
         loadJob?.cancel()
         scope.cancel()
+        // Our light is not owned by ModelViewer. Release before its TextureView
+        // detach listener destroys the engine.
+        viewer.scene.removeEntity(fillLight)
+        viewer.engine.destroyEntity(fillLight)
         super.onDetachedFromWindow()
-        // The ModelViewer's SurfaceView listener owns native resource destruction.
     }
 }
