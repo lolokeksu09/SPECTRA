@@ -44,7 +44,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.3")
-    val filamentVersion = "1.77.3"
+    val filamentVersion = "1.71.6"
     implementation("com.google.android.filament:filament-android:$filamentVersion")
     implementation("com.google.android.filament:gltfio-android:$filamentVersion")
     implementation("com.google.android.filament:filament-utils-android:$filamentVersion")
