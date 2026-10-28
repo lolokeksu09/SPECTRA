@@ -1,6 +1,8 @@
 package com.spectra.twin.ui
 
 import android.app.Application
+import android.content.Context
+import com.spectra.twin.render.DeviceFinish
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -20,6 +22,15 @@ import kotlinx.coroutines.withContext
 class SpectraViewModel(app: Application) : AndroidViewModel(app) {
     private val reader = TelemetryReader(app)
     private val store = SnapshotStore(app)
+    private val preferences = app.getSharedPreferences("spectra-visual-v1", Context.MODE_PRIVATE)
+    var finish by mutableStateOf(DeviceFinish.fromId(preferences.getString("finish", null)))
+        private set
+
+    fun selectFinish(value: DeviceFinish) {
+        if (value == finish) return
+        finish = value
+        preferences.edit().putString("finish", value.id).apply()
+    }
     var latest by mutableStateOf<TelemetrySnapshot?>(null)
         private set
     var history by mutableStateOf<List<TelemetrySnapshot>>(emptyList())

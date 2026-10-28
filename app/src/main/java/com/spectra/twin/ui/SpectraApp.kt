@@ -25,6 +25,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.spectra.twin.core.Metrics
 import com.spectra.twin.core.TelemetrySnapshot
 import com.spectra.twin.render.DeviceGLView
+import com.spectra.twin.render.DeviceFinish
+import androidx.compose.ui.platform.testTag
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,7 +91,7 @@ fun SpectraApp(model: SpectraViewModel) {
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Header(latest?.deviceName ?: "Android", current.title)
             when (current) {
-                Page.TWIN -> TwinScreen(latest, model::snapshot)
+                Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish, model::snapshot)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history)
@@ -120,7 +122,8 @@ private fun Header(device: String, title: String) {
 }
 
 @Composable
-private fun TwinScreen(latest: TelemetrySnapshot?, onSnapshot: () -> Unit) {
+private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
+                       onFinishChange: (DeviceFinish) -> Unit, onSnapshot: () -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 22.dp),
@@ -131,11 +134,11 @@ private fun TwinScreen(latest: TelemetrySnapshot?, onSnapshot: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().height(355.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
-                PhonePreview(Modifier.fillMaxSize())
+                PhonePreview(finish, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
-                    Text("Прототип 3D-корпуса", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Text("LEGION Y70 · визуальный прототип", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
                 Surface(
                     color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
@@ -144,6 +147,26 @@ private fun TwinScreen(latest: TelemetrySnapshot?, onSnapshot: () -> Unit) {
                     Text("Поверните жестом · масштаб — двумя пальцами",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("ЦВЕТ КОРПУСА", style = MaterialTheme.typography.labelMedium, color = Muted)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    DeviceFinish.entries.forEach { option ->
+                        FilterChip(
+                            selected = finish == option,
+                            onClick = { onFinishChange(option) },
+                            label = { Text(option.title) },
+                            leadingIcon = {
+                                Box(Modifier.size(14.dp).clip(RoundedCornerShape(50)).background(
+                                    if (option == DeviceFinish.WHITE) Color(0xFFEDEFF2) else Color(0xFF25282D)
+                                ))
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("finish_" + option.id)
+                        )
+                    }
                 }
             }
         }
@@ -175,17 +198,18 @@ private fun TwinScreen(latest: TelemetrySnapshot?, onSnapshot: () -> Unit) {
                 Text("Сохранить снимок диагностики")
             }
         }
-        item { Caption("Показатели получены от Android. Отсутствующие датчики отмечаются как недоступные. 3D-модель не отображает реальную геометрию внутренних компонентов.") }
+        item { Caption("Показатели получены от Android. Отсутствующие датчики отмечаются как недоступные. Внешняя 3D-модель приближена по изображениям, не является CAD-сканом. Внутренние компоненты не отображаются.") }
     }
 }
 
 @Composable
-private fun PhonePreview(modifier: Modifier = Modifier) {
+private fun PhonePreview(finish: DeviceFinish, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
     val preview = remember { mutableStateOf<DeviceGLView?>(null) }
     AndroidView(
         factory = { ctx -> DeviceGLView(ctx).also { preview.value = it } },
         modifier = modifier,
+        update = { it.setFinish(finish) }
     )
     DisposableEffect(lifecycle, preview.value) {
         val view = preview.value

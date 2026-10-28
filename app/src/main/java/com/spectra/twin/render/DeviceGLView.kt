@@ -14,7 +14,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Native OpenGL ES 2.0 rendering. This is a generic smartphone, not a scan of the Y70. */
+/** Approximate Legion Y70 exterior from user reference images, not a CAD scan. */
 @SuppressLint("ViewConstructor")
 class DeviceGLView(context: Context) : GLSurfaceView(context) {
     private val scene = PhoneRenderer()
@@ -25,6 +25,12 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
             return true
         }
     })
+    fun setFinish(value: DeviceFinish) {
+        if (scene.finish == value) return
+        scene.finish = value
+        requestRender()
+    }
+
     private var lastX = 0f
     private var lastY = 0f
 
@@ -68,7 +74,8 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
 }
 
 private class PhoneRenderer : GLSurfaceView.Renderer {
-    @Volatile var yaw = -27f
+    @Volatile var finish = DeviceFinish.WHITE
+    @Volatile var yaw = 155f
     @Volatile var pitch = -13f
     @Volatile var distance = 4.7f
     private var program = 0
@@ -136,13 +143,18 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         Matrix.multiplyMM(mvp, 0, pv, 0, model, 0)
         GLES20.glUniformMatrix4fv(matrixHandle, 1, false, mvp, 0)
 
+        // Palette changes are visual only. White matches the owner's hardware.
+        val white = finish == DeviceFinish.WHITE
+        val back = if (white) floatArrayOf(.88f,.90f,.92f) else floatArrayOf(.08f,.09f,.10f)
+        val frame = if (white) floatArrayOf(.63f,.67f,.71f) else floatArrayOf(.23f,.26f,.29f)
+        val island = if (white) floatArrayOf(.73f,.76f,.79f) else floatArrayOf(.15f,.17f,.19f)
         // Body: front, back and side faces (z-positive = display).
         quad(-0.65f, -1.35f, .085f, .65f, 1.35f, .085f, .09f, .12f, .17f)
-        quad(-.65f, -1.35f, -.085f, .65f, 1.35f, -.085f, .11f, .16f, .21f)
-        side(floatArrayOf(-.65f,-1.35f,.085f, -.65f,1.35f,.085f, -.65f,1.35f,-.085f, -.65f,-1.35f,-.085f), .24f,.30f,.36f)
-        side(floatArrayOf(.65f,-1.35f,-.085f, .65f,1.35f,-.085f, .65f,1.35f,.085f, .65f,-1.35f,.085f), .25f,.31f,.38f)
-        side(floatArrayOf(-.65f,1.35f,.085f, .65f,1.35f,.085f, .65f,1.35f,-.085f, -.65f,1.35f,-.085f), .31f,.36f,.42f)
-        side(floatArrayOf(-.65f,-1.35f,-.085f, .65f,-1.35f,-.085f, .65f,-1.35f,.085f, -.65f,-1.35f,.085f), .10f,.15f,.20f)
+        quad(-.65f, -1.35f, -.085f, .65f, 1.35f, -.085f, back[0], back[1], back[2])
+        side(floatArrayOf(-.65f,-1.35f,.085f, -.65f,1.35f,.085f, -.65f,1.35f,-.085f, -.65f,-1.35f,-.085f), frame[0],frame[1],frame[2])
+        side(floatArrayOf(.65f,-1.35f,-.085f, .65f,1.35f,-.085f, .65f,1.35f,.085f, .65f,-1.35f,.085f), frame[0],frame[1],frame[2])
+        side(floatArrayOf(-.65f,1.35f,.085f, .65f,1.35f,.085f, .65f,1.35f,-.085f, -.65f,1.35f,-.085f), frame[0],frame[1],frame[2])
+        side(floatArrayOf(-.65f,-1.35f,-.085f, .65f,-1.35f,-.085f, .65f,-1.35f,.085f, -.65f,-1.35f,.085f), frame[0],frame[1],frame[2])
 
         // Front glass: inset inactive OLED and a narrow dynamic blue visual accent.
         quad(-.607f,-1.27f,.090f, .607f,1.27f,.090f, .018f,.029f,.052f)
@@ -150,13 +162,21 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         quad(-.05f,1.21f,.093f, .05f,1.224f,.093f, .14f,.19f,.24f)
         circle(0f,1.15f,.094f,.012f, .10f,.13f,.17f)
 
-        // Back camera bump and three lenses; intentional generic shape.
-        quad(-.55f,.60f,-.096f, -.06f,1.22f,-.096f, .16f,.21f,.26f)
-        circle(-.4f,1.08f,-.103f,.108f, .045f,.055f,.07f)
-        circle(-.4f,1.08f,-.106f,.063f, .11f,.29f,.40f)
-        circle(-.4f,.80f,-.103f,.108f, .045f,.055f,.07f)
-        circle(-.4f,.80f,-.106f,.063f, .08f,.24f,.33f)
-        circle(-.17f,.95f,-.104f,.073f, .055f,.065f,.08f)
+        // 2x2 camera island: three lenses and the LED, after user references.
+        quad(-.56f,.52f,-.096f, -.06f,1.23f,-.096f, island[0],island[1],island[2])
+        circle(-.43f,1.055f,-.101f,.117f, .09f,.10f,.12f)
+        circle(-.43f,1.055f,-.105f,.075f, .017f,.025f,.034f)
+        circle(-.43f,1.055f,-.109f,.040f, .07f,.17f,.22f)
+        circle(-.18f,1.055f,-.101f,.091f, .10f,.12f,.14f)
+        circle(-.18f,1.055f,-.105f,.055f, .019f,.027f,.038f)
+        circle(-.43f,.735f,-.101f,.117f, .09f,.10f,.12f)
+        circle(-.43f,.735f,-.105f,.075f, .017f,.025f,.034f)
+        circle(-.43f,.735f,-.109f,.040f, .08f,.20f,.24f)
+        circle(-.18f,.735f,-.103f,.075f, .16f,.17f,.19f)
+        circle(-.18f,.735f,-.107f,.050f, .92f,.89f,.70f)
+        // Low-contrast camera-sided LEGION wordmark will follow when its verified
+        // lettering and measured placement are available; no fake internals.
+
     }
 
     private fun quad(x1:Float,y1:Float,z1:Float,x2:Float,y2:Float,z2:Float,r:Float,g:Float,b:Float) {

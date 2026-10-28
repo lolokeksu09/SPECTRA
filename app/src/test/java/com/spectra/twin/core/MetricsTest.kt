@@ -2,6 +2,7 @@ package com.spectra.twin.core
 
 import org.junit.Assert.*
 import org.junit.Test
+import com.spectra.twin.render.DeviceFinish
 
 class MetricsTest {
     @Test fun batteryRejectsUnknownScaleAndInvalidLevels() {
@@ -31,5 +32,11 @@ class MetricsTest {
         assertEquals("Критический нагрев", Metrics.thermalStatus(4))
         assertEquals("Недоступно", Metrics.thermalStatus(null))
         assertEquals("Недоступно", Metrics.thermalStatus(90))
+    }
+    @Test fun visualFinishDefaultsToWhiteAndHandlesInvalidSavedIds() {
+        assertEquals(DeviceFinish.WHITE, DeviceFinish.fromId(null))
+        assertEquals(DeviceFinish.WHITE, DeviceFinish.fromId("unknown"))
+        assertEquals(DeviceFinish.WHITE, DeviceFinish.fromId("white"))
+        assertEquals(DeviceFinish.BLACK, DeviceFinish.fromId("black"))
     }
 }
