@@ -14,7 +14,6 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
-import android.view.GestureDetector
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -26,10 +25,16 @@ import kotlin.math.sin
 @SuppressLint("ViewConstructor")
 class DeviceGLView(context: Context) : GLSurfaceView(context) {
     private val scene = PhoneRenderer()
+    private var lastX = 0f
+    private var lastY = 0f
+    private var touchActive = false
     private val scale = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            scene.distance = (scene.distance / detector.scaleFactor).coerceIn(3.2f, 8f)
-            requestRender()
+            val next = ViewerMotion.zoom(scene.distance, detector.scaleFactor)
+            if (next != scene.distance) {
+                scene.distance = next
+                requestRender()
+            }
             return true
         }
     })
@@ -49,11 +54,11 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
         }
     }
 
-    private var lastX = 0f
-    private var lastY = 0f
-
     init {
         setEGLContextClientVersion(2)
+        // Retain the EGL context across normal pauses when the device permits it;
+        // onSurfaceCreated remains responsible for rebuilding after context loss.
+        setPreserveEGLContextOnPause(true)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         setRenderer(scene)
         renderMode = RENDERMODE_WHEN_DIRTY
@@ -65,21 +70,44 @@ class DeviceGLView(context: Context) : GLSurfaceView(context) {
         scale.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                lastX = event.x; lastY = event.y
-                return true
+                touchActive = true
+                parent?.requestDisallowInterceptTouchEvent(true)
+                lastX = event.x
+                lastY = event.y
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // A new finger must not produce a large single-finger jump.
+                lastX = event.getX(0)
+                lastY = event.getY(0)
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val other = if (event.actionIndex == 0) 1 else 0
+                if (other < event.pointerCount) {
+                    lastX = event.getX(other)
+                    lastY = event.getY(other)
+                }
             }
             MotionEvent.ACTION_MOVE -> {
-                if (!scale.isInProgress && event.pointerCount == 1) {
-                    scene.yaw += (event.x - lastX) * 0.45f
-                    scene.pitch = (scene.pitch + (event.y - lastY) * 0.35f).coerceIn(-75f, 75f)
-                    requestRender()
+                if (touchActive && !scale.isInProgress && event.pointerCount == 1) {
+                    val newYaw = ViewerMotion.yaw(scene.yaw, (event.x - lastX) * .45f)
+                    val newPitch = ViewerMotion.pitch(scene.pitch, (event.y - lastY) * .35f)
+                    if (newYaw != scene.yaw || newPitch != scene.pitch) {
+                        scene.yaw = newYaw
+                        scene.pitch = newPitch
+                        requestRender()
+                    }
                 }
-                lastX = event.x; lastY = event.y
-                return true
+                lastX = event.getX(0)
+                lastY = event.getY(0)
             }
             MotionEvent.ACTION_UP -> {
+                touchActive = false
+                parent?.requestDisallowInterceptTouchEvent(false)
                 performClick()
-                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                touchActive = false
+                parent?.requestDisallowInterceptTouchEvent(false)
             }
         }
         return true
@@ -118,6 +146,10 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
     private var frontTex = 0
     private var whiteTex = 0
     private var blackTex = 0
+    // Reusing the interleaved decal buffers avoids allocating direct memory for
+    // every finger movement and reduces GC / driver pressure.
+    private val frontDecal = makeDecalBuffer(-.589f,-1.281f,.098f,.589f,1.281f,false)
+    private val rearDecal = makeDecalBuffer(-.605f,-1.31f,-.089f,.605f,1.31f,true)
     private val mv = FloatArray(16)
     private var matrixHandle = 0
     private val view = FloatArray(16)
@@ -226,9 +258,8 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
 
         // The two surface textures are lightweight; all underlying solid geometry
         // is retained between gestures and only regenerated for a finish change.
-        decal(frontTex,-.589f,-1.281f,.098f,.589f,1.281f,false)
-        decal(if(appearance == DeviceFinish.WHITE) whiteTex else blackTex,
-              -.605f,-1.31f,-.089f,.605f,1.31f,true)
+        decal(frontTex,frontDecal)
+        decal(if(appearance == DeviceFinish.WHITE) whiteTex else blackTex,rearDecal)
     }
 
     private fun generateGeometry(appearance: DeviceFinish) {
@@ -265,6 +296,26 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
             .59f,.62f,.66f)
         side(floatArrayOf(.658f,.57f,-.037f,.658f,.84f,-.037f,.658f,.84f,.040f,.658f,.57f,.040f),
             .59f,.62f,.66f)
+
+        // Exterior details from the owner's photos. These are surface
+        // indications, not claims of precision-machined port geometry.
+        // Type-C recess on the lower rim.
+        side(floatArrayOf(-.092f,-1.352f,-.036f, .092f,-1.352f,-.036f,
+                          .092f,-1.352f,.036f, -.092f,-1.352f,.036f),
+             .065f,.080f,.093f)
+        // Speaker openings, kept intentionally subtle to avoid fake internals.
+        for (i in 0..3) {
+            val x = -.37f + .061f * i
+            side(floatArrayOf(x,-1.354f,-.024f, x+.020f,-1.354f,-.024f,
+                              x+.020f,-1.354f,.024f, x,-1.354f,.024f),
+                 .12f,.13f,.15f)
+        }
+        // Antenna breaks in the silver/graphite frame.
+        for (y in floatArrayOf(-1.05f,1.05f)) {
+            side(floatArrayOf(.654f,y,-.084f, .654f,y+.012f,-.084f,
+                              .654f,y+.012f,.084f, .654f,y,.084f),
+                 .34f,.36f,.39f)
+        }
 
     }
 
@@ -398,15 +449,17 @@ private class PhoneRenderer : GLSurfaceView.Renderer {
         return ids[0]
     }
 
-    private fun decal(tex:Int,x1:Float,y1:Float,z:Float,x2:Float,y2:Float,back:Boolean) {
-        // Flip U for the rear surface: a viewer facing the rear sees mirrored X.
-        val u0=if(back) 1f else 0f
-        val u1=if(back) 0f else 1f
+    private fun makeDecalBuffer(x1:Float,y1:Float,z:Float,x2:Float,y2:Float,back:Boolean):FloatBuffer {
+        val u0 = if (back) 1f else 0f
+        val u1 = if (back) 0f else 1f
         val a=floatArrayOf(
-            x1,y1,z,u0,1f,  x2,y1,z,u1,1f,  x1,y2,z,u0,0f,
-            x1,y2,z,u0,0f,  x2,y1,z,u1,1f,  x2,y2,z,u1,0f)
-        val fb=ByteBuffer.allocateDirect(a.size*4).order(ByteOrder.nativeOrder())
+            x1,y1,z,u0,1f, x2,y1,z,u1,1f, x1,y2,z,u0,0f,
+            x1,y2,z,u0,0f, x2,y1,z,u1,1f, x2,y2,z,u1,0f)
+        return ByteBuffer.allocateDirect(a.size*4).order(ByteOrder.nativeOrder())
             .asFloatBuffer().apply { put(a);position(0) }
+    }
+
+    private fun decal(tex:Int,fb:FloatBuffer) {
         GLES20.glUseProgram(decalProgram)
         GLES20.glUniformMatrix4fv(decalMvp,1,false,mvp,0)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
