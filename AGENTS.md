@@ -9,3 +9,11 @@
 - Run `testDebugUnitTest` and `assembleDebug` before declaring an APK working. Record build SHA, source revision, test and device evidence separately.
 - For telemetry behavior changes, test unknown and invalid sensors, missing data, and lifecycle suspend/resume.
 - Do not claim real-device tests from Compose previews or CI builds.
+
+## Workflow Standard v1.3 — интеграция
+
+- Перед многокомпонентной правкой проверь [PROJECT.md](PROJECT.md), исходный код и CI; не путай утверждённые решения и предположения.
+- Для проверок и релизов используй [TESTING-LEVELS.md](TESTING-LEVELS.md). Записывай SHA, конкретные команды и ограничения в доказательствах.
+- После UI-правок отдельно проверяй экран и жесты на новой сборке эмулятора/телефона. CI-билд сам по себе не является визуальной проверкой или L5.
+- Повторяй проверку при существенном изменении, не удаляй пользовательские данные и не перезаписывай чужие изменения.
+- Интеграция оригинального архива документирована в [docs/WORKFLOW-ADOPTION.md](docs/WORKFLOW-ADOPTION.md).
