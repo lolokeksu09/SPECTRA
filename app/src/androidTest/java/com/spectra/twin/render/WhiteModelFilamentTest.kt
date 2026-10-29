@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.PI
 
 /** Real Android Filament/gltfio loading + GPU output; this does not certify the Legion hardware. */
 @RunWith(AndroidJUnit4::class)
@@ -30,7 +31,7 @@ class WhiteModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v18/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v19/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -46,14 +47,14 @@ class WhiteModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun whiteV17AndV18RenderInUnmodifiedFilament() {
+    @Test fun whiteV18AndV19RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v17", "v18")) {
-            val source = if (version == "v17") {
-                val file = File(app.cacheDir, "white-v17-test.glb")
-                instrumentation.context.assets.open("models/white-v17.glb").use { input ->
+        for (version in listOf("v18", "v19")) {
+            val source = if (version == "v18") {
+                val file = File(app.cacheDir, "white-v18-test.glb")
+                instrumentation.context.assets.open("models/white-v18.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
@@ -76,7 +77,7 @@ class WhiteModelFilamentTest {
                 metrics.put(JSONObject().put("version", version).put("gltfio_load_ms", loadMs)
                     .put("process_pss_kib", memory.totalPss)
                     .put("environment", "Android API 35 emulator / SwiftShader; not Legion hardware"))
-                for (shot in listOf("rear", "cameras", "bottom", "top")) {
+                for (shot in listOf("rear", "cameras", "bottom", "top", "button-side", "opposite-side", "volume-closeup")) {
                     scenario.onActivity { activity ->
                         val view = activity.model
                         view.showSide(when (shot) {
@@ -90,6 +91,12 @@ class WhiteModelFilamentTest {
                             field(view, "focusY", .67)
                             field(view, "radius", 2.15f)
                         }
+                        if (shot in listOf("button-side", "opposite-side", "volume-closeup")) {
+                            field(view, "yaw", if (shot == "opposite-side") (PI / 2).toFloat() else (-PI / 2).toFloat())
+                            field(view, "pitch", 0f)
+                            field(view, "focusY", if (shot == "volume-closeup") .60 else 0.0)
+                            field(view, "radius", if (shot == "volume-closeup") 1.05f else 4.2f)
+                        }
                     }
                     // A nonblank previous frame is not evidence for a new bookmark.
                     // Let the native presentation queue advance before validating its shape.
@@ -100,6 +107,7 @@ class WhiteModelFilamentTest {
                     var visible = 0
                     var dark = 0
                     var visibleSpan = 0
+                    var visibleWidth = 0
                     var correctShape = false
                     var lastPixels: Bitmap? = null
                     var state = JSONObject()
@@ -126,6 +134,8 @@ class WhiteModelFilamentTest {
                             dark = 0
                             var minY = pixels.height
                             var maxY = -1
+                            var minX = pixels.width
+                            var maxX = -1
                             for (y in 0 until pixels.height step 4) for (x in 0 until pixels.width step 4) {
                                 val p = pixels.getPixel(x, y)
                                 val r = (p shr 16) and 255
@@ -135,18 +145,25 @@ class WhiteModelFilamentTest {
                                     visible++
                                     minY = minOf(minY, y)
                                     maxY = maxOf(maxY, y)
+                                    minX = minOf(minX, x)
+                                    maxX = maxOf(maxX, x)
                                 } else dark++
                             }
                             visibleSpan = maxY - minY
+                            visibleWidth = maxX - minX
                             correctShape = when (shot) {
                                 "bottom", "top" -> visibleSpan in 10..(pixels.height * .30).toInt()
                                 "rear" -> visibleSpan > pixels.height * .35 && visibleSpan < pixels.height * .85
+                                "button-side", "opposite-side" -> visibleSpan > pixels.height * .40 &&
+                                    visibleSpan < pixels.height * .9 && visibleWidth in 8..(pixels.width * .30).toInt()
+                                "volume-closeup" -> visibleSpan > pixels.height * .90 && visibleWidth < pixels.width * .85
                                 else -> visibleSpan > pixels.height * .60
                             }
                         }
                     } while ((visible <= 150 || dark <= 150 || !correctShape) && SystemClock.uptimeMillis() < frameLimit)
                     state.put("visible_samples", visible).put("dark_samples", dark)
-                        .put("visible_span_pixels", visibleSpan).put("correct_bookmark_shape", correctShape)
+                        .put("visible_span_pixels", visibleSpan).put("visible_width_pixels", visibleWidth)
+                        .put("correct_bookmark_shape", correctShape)
                     saveJson("white-$version-$shot-state.json", state.toString(2))
                     saveJson("android-load-metrics.json", metrics.toString(2))
                     val pixels = requireNotNull(lastPixels) { "GPU readback unavailable: $state" }

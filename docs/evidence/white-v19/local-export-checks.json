@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "version": 19,
+  "meshes": 101,
+  "triangles": 84092,
+  "protected_meshes_exact": 95,
+  "rocker_connected": true,
+  "rocker_groove_depth_mm": 0.1186,
+  "side_antenna_width_mm": 0.65,
+  "lower_side_antenna_y_mm": -41.0,
+  "side_antenna_placement": "photo-derived approximation; upper centres retained",
+  "usb_antenna_centres_mm": [
+    -5.9,
+    5.9
+  ],
+  "bytes": 4799468,
+  "sha256": "6fa7604c39d375a6174d47af7bab5c15f881243865de4818552529d4c4b6028c",
+  "physical_device_tested": false,
+  "hardware_fps_measured": false
+}
