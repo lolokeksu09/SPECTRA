@@ -35,7 +35,6 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private val surface = TextureView(context).apply { isOpaque = true }
     private val viewer: ModelViewer
     private var fillLight: Int = 0
-    private var undersideLight: Int = 0
     private var nativeReleased = false
     private val scheduler = Choreographer.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -82,6 +81,14 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                         0.0, 0.0, focusZ,
                         pose.upX, pose.upY, pose.upZ
                     )
+                    // Filament uses only the strongest directional light by
+                    // default. Orbit-aware lighting prevents the physical
+                    // underside (-Y) from going black when viewed from below.
+                    val key = SceneLighting.keyDirection(pose, focusZ)
+                    viewer.engine.lightManager.setDirection(
+                        viewer.engine.lightManager.getInstance(viewer.light),
+                        key.x, key.y, key.z
+                    )
                     viewer.render(ns)
                     frameFailures = 0
                 } catch (e: Exception) {
@@ -108,18 +115,12 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 generation++
                 loadJob?.cancel()
                 scope.cancel()
-                if (!nativeReleased) {
+                if (!nativeReleased && fillLight != 0) {
                     nativeReleased = true
-                    // Remove our lights before ModelViewer releases the Filament engine.
-                    for (light in intArrayOf(fillLight, undersideLight)) {
-                        if (light != 0) {
-                            viewer.scene.removeEntity(light)
-                            viewer.engine.destroyEntity(light)
-                            EntityManager.get().destroy(light)
-                        }
-                    }
+                    viewer.scene.removeEntity(fillLight)
+                    viewer.engine.destroyEntity(fillLight)
+                    EntityManager.get().destroy(fillLight)
                     fillLight = 0
-                    undersideLight = 0
                 }
             }
         })
@@ -152,7 +153,9 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         viewer.engine.lightManager.setDirection(
             viewer.engine.lightManager.getInstance(viewer.light), -.3f, -.6f, -.8f
         )
-        // Back face was almost black: the default sun lights only one side.
+        // Legacy secondary directional fill; default Filament evaluates only
+        // the dominant directional light. The orbit-aware key above provides
+        // illumination on each side without requiring extra scene lights.
         fillLight = EntityManager.get().create()
         LightManager.Builder(LightManager.Type.DIRECTIONAL)
             .direction(.25f, -.45f, .85f)
@@ -160,18 +163,6 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
             .castShadows(false)
             .build(viewer.engine, fillLight)
         viewer.scene.addEntity(fillLight)
-        // Both existing sun/fill lights point downward. Without an IBL, the
-        // physical -Y bottom edge goes nearly black at a low viewing angle.
-        // A soft upward-facing fill keeps USB-C and speaker details readable.
-        // This illuminates the scene, not an emissive/brightened phone material.
-        undersideLight = EntityManager.get().create()
-        val underside = SceneLighting.underside
-        LightManager.Builder(LightManager.Type.DIRECTIONAL)
-            .direction(underside.directionX, underside.directionY, underside.directionZ)
-            .intensity(underside.intensityLux)
-            .castShadows(false)
-            .build(viewer.engine, undersideLight)
-        viewer.scene.addEntity(undersideLight)
         surface.setOnTouchListener { _, event -> handleTouch(event) }
         contentDescription = "3D-модель Lenovo Legion Y70. Вращение на 360 градусов по горизонтали и вертикали одним пальцем, масштаб двумя."
     }
