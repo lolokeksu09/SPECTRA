@@ -31,12 +31,12 @@ jobs:
         run: python3 scripts/check-v9-models.py
       - name: Install Python dependencies for offline model packaging
         run: python3 -m pip install --disable-pip-version-check numpy==2.3.5 pillow==12.3.0 trimesh==4.11.1
-      - name: Build White v13 mobile 3D model into APK assets
+      - name: Build White v14 mobile 3D model into APK assets
         shell: bash
         run: |
           set -euo pipefail
           cp app/src/main/assets/models/legion_y70_white.glb /tmp/legion_y70_white_v9.glb
-          python3 scripts/build-white-v13-mobile.py \
+          python3 scripts/build-white-v14-mobile.py \
             /tmp/legion_y70_white_v9.glb \
             app/src/main/assets/models/legion_y70_white.glb
       - name: Test and build
