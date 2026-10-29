@@ -135,7 +135,9 @@ def refine(source):
     grain, normal, packed = metal_maps()
     plate = scene.geometry['009_camera_island_flush_face']
     set_material(plate, PBRMaterial(name='White_v18_micrograin_silver_plate',
-        baseColorFactor=[255, 255, 255, 255], baseColorTexture=grain,
+        # SPECTRA intentionally bypasses tone mapping. Keep the silver's diffuse
+        # energy below clipping under its existing key + SH fill so grain survives.
+        baseColorFactor=[170, 173, 176, 255], baseColorTexture=grain,
         normalTexture=normal, metallicRoughnessTexture=packed,
         metallicFactor=.30, roughnessFactor=1., doubleSided=False), planar_uv(plate))
     rear = scene.geometry[REAR].visual.material

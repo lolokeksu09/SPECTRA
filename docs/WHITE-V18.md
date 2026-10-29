@@ -9,6 +9,7 @@ The existing packaging chain is retained: immutable bundled v9 → `build-white-
 - Replace six flat optical discs within the two large lens housings with curved optical annuli, recessed chambers and convex aspheric pupils. Existing housing centres and outer rings are retained. Move six small optical/coating surfaces inward by 0.235 mm to match the new chamber depth.
 - Bake only the verified `LYTIA 50MP` lettering into the upper arc of the lower-left optical ring. Reference `3415.jpg` shows these characters; no uncertain lower-arc wording is invented. The photo's diagonal orientation is resolved to the phone's upright coordinates.
 - Preserve the existing concentric ring geometry; adjust its metallic/roughness response.
+- Limit the camera plateau's diffuse factor to keep its silver micrograin below clipping under SPECTRA's unchanged key/SH lighting with tone mapping bypassed.
 - Add deterministic 512² base/roughness/normal maps to the silver camera plateau and a subtle 512×1024 etched-glass normal/roughness map to the rear. The rear base texture and UVs, including LEGION and Lenovo, remain exact.
 - Match the two lower antenna inserts more closely to the light silver rail. Their vertices, faces and centres at ±5.9 mm from USB-C remain exact.
 - Export normals for every mesh and explicit tangent frames for normal-mapped surfaces. Core glTF 2.0 PBR only: no transmission, custom shaders, network assets or lighting changes.

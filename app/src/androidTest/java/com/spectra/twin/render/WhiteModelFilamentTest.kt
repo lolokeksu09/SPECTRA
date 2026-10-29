@@ -88,14 +88,19 @@ class WhiteModelFilamentTest {
                             field(view, "yaw", 0f)
                             field(view, "pitch", -.08f)
                             field(view, "focusY", .67)
-                            field(view, "radius", 1.3f)
+                            field(view, "radius", 2.15f)
                         }
                     }
+                    // A nonblank previous frame is not evidence for a new bookmark.
+                    // Let the native presentation queue advance before validating its shape.
+                    SystemClock.sleep(1500)
                     // CPU-side gltfio load completion precedes the first GPU frame.
                     // Wait for visible GPU output with a deadline; retain failure evidence too.
                     val frameLimit = SystemClock.uptimeMillis() + 30_000
                     var visible = 0
                     var dark = 0
+                    var visibleSpan = 0
+                    var correctShape = false
                     var lastPixels: Bitmap? = null
                     var state = JSONObject()
                     do {
@@ -119,16 +124,29 @@ class WhiteModelFilamentTest {
                             lastPixels = pixels
                             visible = 0
                             dark = 0
+                            var minY = pixels.height
+                            var maxY = -1
                             for (y in 0 until pixels.height step 4) for (x in 0 until pixels.width step 4) {
                                 val p = pixels.getPixel(x, y)
                                 val r = (p shr 16) and 255
                                 val g = (p shr 8) and 255
                                 val b = p and 255
-                                if (r > 65 || g > 65 || b > 65) visible++ else dark++
+                                if (r > 65 || g > 65 || b > 65) {
+                                    visible++
+                                    minY = minOf(minY, y)
+                                    maxY = maxOf(maxY, y)
+                                } else dark++
+                            }
+                            visibleSpan = maxY - minY
+                            correctShape = when (shot) {
+                                "bottom", "top" -> visibleSpan in 10..(pixels.height * .30).toInt()
+                                "rear" -> visibleSpan > pixels.height * .35 && visibleSpan < pixels.height * .85
+                                else -> visibleSpan > pixels.height * .60
                             }
                         }
-                    } while ((visible <= 150 || dark <= 150) && SystemClock.uptimeMillis() < frameLimit)
+                    } while ((visible <= 150 || dark <= 150 || !correctShape) && SystemClock.uptimeMillis() < frameLimit)
                     state.put("visible_samples", visible).put("dark_samples", dark)
+                        .put("visible_span_pixels", visibleSpan).put("correct_bookmark_shape", correctShape)
                     saveJson("white-$version-$shot-state.json", state.toString(2))
                     saveJson("android-load-metrics.json", metrics.toString(2))
                     val pixels = requireNotNull(lastPixels) { "GPU readback unavailable: $state" }
@@ -139,6 +157,7 @@ class WhiteModelFilamentTest {
                     pixels.recycle()
                     assertTrue("$version/$shot blank render: $state", visible > 150)
                     assertTrue("$version/$shot missing background: $state", dark > 150)
+                    assertTrue("$version/$shot stale or incorrect bookmark frame: $state", correctShape)
                 }
             }
         }
