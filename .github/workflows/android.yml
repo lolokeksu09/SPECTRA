@@ -51,16 +51,21 @@ jobs:
           python3 scripts/refine-white-v18.py build/model-evidence/white-v17.glb app/src/main/assets/models/legion_y70_white.glb
           python3 scripts/check-white-v18.py build/model-evidence/white-v17.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v18-checks.json
           cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v18.glb
-          cp build/model-evidence/white-v18.glb app/src/androidTest/assets/models/white-v18.glb
       - name: Refine and verify White v19 volume rocker and exposed side antenna seams
         run: |
           python3 scripts/refine-white-v19.py build/model-evidence/white-v18.glb app/src/main/assets/models/legion_y70_white.glb
           python3 scripts/check-white-v19.py build/model-evidence/white-v18.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v19-checks.json
           cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v19.glb
+          cp build/model-evidence/white-v19.glb app/src/androidTest/assets/models/white-v19.glb
+      - name: Refine and verify White v20 matching rounded power and smart keys
+        run: |
+          python3 scripts/refine-white-v20.py build/model-evidence/white-v19.glb app/src/main/assets/models/legion_y70_white.glb
+          python3 scripts/check-white-v20.py build/model-evidence/white-v19.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v20-checks.json
+          cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v20.glb
       - name: Khronos glTF validation including normals, UVs and tangent frames
         run: |
           npm install --prefix "$RUNNER_TEMP/gltf-validation" --no-audit --no-fund gltf-validator@2.0.0-dev.3.10
-          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/white-v19.glb build/model-evidence/gltf-validator.json
+          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/white-v20.glb build/model-evidence/gltf-validator.json
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Enable KVM for actual Android Filament rendering
@@ -68,7 +73,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Android Filament v18 and v19 render regression with both side faces and volume closeup
+      - name: Android Filament v19 and v20 render regression with all side keys
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -81,7 +86,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: White-v19-verification
+          name: White-v20-verification
           path: |
             build/model-evidence/
             app/build/reports/tests/
@@ -98,10 +103,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd build/model-evidence && zip -qr ../../White-v19-verification.zip . && cd ../..
-          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk White-v19-verification.zip \
-            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · White v19 · build ${GITHUB_RUN_NUMBER}" \
-            --notes "White v19: joined rounded volume rocker with central groove; visible light side antenna seams. Debug APK built, unit-tested and rendered with Android Filament on an API 35 emulator at commit ${GITHUB_SHA}. Export geometry/PBR contracts passed. Includes v18/v19 GLBs and actual Filament screenshots. Physical Legion Y70 validation and hardware FPS remain pending. Debug-signed, not production-signed." --prerelease
+          cd build/model-evidence && zip -qr ../../White-v20-verification.zip . && cd ../..
+          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk White-v20-verification.zip \
+            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · White v20 · build ${GITHUB_RUN_NUMBER}" \
+            --notes "White v20: rounded power key and opposite smart key matching the v19 volume rocker finish; single keys have continuous faces. Key envelopes and 97 protected meshes retained; chassis remains 163.96 x 77.32 x 8.29 mm. Debug APK built, unit-tested and rendered with unmodified Android Filament on an API 35 emulator at commit ${GITHUB_SHA}. Includes before/after GLBs, checks and 16 actual Filament screenshots. Physical Legion Y70 validation and hardware FPS remain pending. Debug-signed, not production-signed." --prerelease
       - name: Publish tagged development release
         if: startsWith(github.ref, 'refs/tags/v')
         env:

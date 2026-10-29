@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "version": 20,
+  "meshes": 99,
+  "triangles": 88012,
+  "protected_meshes_exact": 97,
+  "rounded_keys_envelope_xyz_mm": {
+    "064_power_button": [
+      0.815991,
+      12.279386,
+      2.090344
+    ],
+    "V4_dedicated_smart_key": [
+      0.684999,
+      9.999998,
+      2.08
+    ]
+  },
+  "chassis_xyz_mm": [
+    77.319995,
+    163.959995,
+    8.29
+  ],
+  "usb_antenna_centres_mm": [
+    -5.9,
+    5.9
+  ],
+  "bytes": 4891952,
+  "sha256": "56ee6ddb925f8f7ec51e09fe14d38d934482140546c7017ebe6d99da567d1714",
+  "physical_device_tested": false,
+  "hardware_fps_measured": false
+}

@@ -31,7 +31,7 @@ class WhiteModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v19/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v20/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -47,14 +47,14 @@ class WhiteModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun whiteV18AndV19RenderInUnmodifiedFilament() {
+    @Test fun whiteV19AndV20RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v18", "v19")) {
-            val source = if (version == "v18") {
-                val file = File(app.cacheDir, "white-v18-test.glb")
-                instrumentation.context.assets.open("models/white-v18.glb").use { input ->
+        for (version in listOf("v19", "v20")) {
+            val source = if (version == "v19") {
+                val file = File(app.cacheDir, "white-v19-test.glb")
+                instrumentation.context.assets.open("models/white-v19.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
@@ -77,7 +77,7 @@ class WhiteModelFilamentTest {
                 metrics.put(JSONObject().put("version", version).put("gltfio_load_ms", loadMs)
                     .put("process_pss_kib", memory.totalPss)
                     .put("environment", "Android API 35 emulator / SwiftShader; not Legion hardware"))
-                for (shot in listOf("rear", "cameras", "bottom", "top", "button-side", "opposite-side", "volume-closeup")) {
+                for (shot in listOf("rear", "cameras", "bottom", "top", "button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
                     scenario.onActivity { activity ->
                         val view = activity.model
                         view.showSide(when (shot) {
@@ -91,12 +91,14 @@ class WhiteModelFilamentTest {
                             field(view, "focusY", .67)
                             field(view, "radius", 2.15f)
                         }
-                        if (shot in listOf("button-side", "opposite-side", "volume-closeup")) {
-                            field(view, "yaw", if (shot == "opposite-side") (PI / 2).toFloat() else (-PI / 2).toFloat())
+                        if (shot in listOf("button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
+                            val opposite = shot in listOf("opposite-side", "smart-key-closeup")
+                            val closeup = shot in listOf("volume-closeup", "smart-key-closeup")
+                            field(view, "yaw", if (opposite) (PI / 2).toFloat() else (-PI / 2).toFloat())
                             field(view, "pitch", 0f)
-                            field(view, "focusY", if (shot == "volume-closeup") .60 else 0.0)
+                            field(view, "focusY", if (closeup) .60 else 0.0)
                             // Respect FullOrbit's real 1.6 minimum, including in the test host.
-                            field(view, "radius", if (shot == "volume-closeup") 1.6f else 4.2f)
+                            field(view, "radius", if (closeup) 1.6f else 4.2f)
                         }
                     }
                     // A nonblank previous frame is not evidence for a new bookmark.
@@ -159,7 +161,7 @@ class WhiteModelFilamentTest {
                                     visibleSpan < pixels.height * .9 && visibleWidth in 8..(pixels.width * .30).toInt()
                                 // At the actual 1.6 zoom limit, the focused upper side occupies
                                 // ~87% of this 1:2 viewport, rather than extending beyond its top.
-                                "volume-closeup" -> visibleSpan > pixels.height * .80 && visibleSpan < pixels.height * .96 &&
+                                "volume-closeup", "smart-key-closeup" -> visibleSpan > pixels.height * .80 && visibleSpan < pixels.height * .96 &&
                                     visibleWidth in (pixels.width * .12).toInt()..(pixels.width * .50).toInt()
                                 else -> visibleSpan > pixels.height * .60
                             }

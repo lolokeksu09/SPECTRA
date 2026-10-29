@@ -40,7 +40,7 @@ def one_connected(mesh):
     return len({root(i) for i in range(len(parent))}) == 1
 
 
-def rocker(bounds):
+def rocker(bounds, groove_depth=.00012):
     lo, hi = bounds
     center = (lo + hi) / 2
     radius = (hi[2] - lo[2]) / 2
@@ -49,8 +49,9 @@ def rocker(bounds):
     low, high = lo[1] + radius, hi[1] - radius
     cap = np.linspace(.13, np.pi / 2, 9)
     sections = [(low - radius * np.cos(t), np.sin(t)) for t in cap]
-    ys = np.concatenate((np.linspace(low, high, 15),
-                         center[1] + np.array([-.00030, -.00019, -.00010, 0, .00010, .00019, .00030])))
+    groove_sections = (center[1] + np.array([-.00030, -.00019, -.00010, 0, .00010, .00019, .00030])
+                       if groove_depth else np.array([]))
+    ys = np.concatenate((np.linspace(low, high, 15), groove_sections))
     sections += [(y, 1.) for y in sorted(set(ys)) if low <= y <= high]
     sections += [(high + radius * np.cos(t), np.sin(t)) for t in cap[::-1]]
     sections = sorted(set((round(y, 12), round(scale, 12)) for y, scale in sections))
@@ -60,7 +61,7 @@ def rocker(bounds):
         for angle in angles:
             c = np.cos(angle)
             px = np.sign(c) * abs(c) ** .40
-            groove = .00012 * max(0., 1 - abs(y - center[1]) / .00019)
+            groove = groove_depth * max(0., 1 - abs(y - center[1]) / .00019)
             vertices.append((center[0] + half_depth * scale * px + groove * max(-px, 0) ** 4,
                              y, center[2] + radius * scale * np.sin(angle)))
     faces = []
@@ -78,11 +79,13 @@ def rocker(bounds):
         faces += cap_faces if end == 0 else [f[::-1] for f in cap_faces]
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
     assert mesh.is_watertight and mesh.is_winding_consistent and one_connected(mesh) and mesh.volume > 0
+    if not groove_depth:
+        return mesh, None
     # A narrow dark surface at the bottom of the groove, conforming to the rocker face.
     vertices, faces = [], []
     zs = np.linspace(-.83, .83, 25)
     for dy in (-.000055, .000055):
-        groove = .00012 * (1 - abs(dy) / .00019)
+        groove = groove_depth * (1 - abs(dy) / .00019)
         for z in zs:
             px = -(1 - z * z) ** .20
             vertices.append((center[0] + half_depth * px + groove * (-px) ** 4 - .000004,
