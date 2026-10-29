@@ -12,12 +12,12 @@ timeout 30s adb wait-for-device
 adb logcat -d > build/model-evidence/android-logcat.txt
 # Public MediaStore Downloads survive Gradle's automatic test-app uninstall.
 if [ "$spectra_test_status" -eq 0 ]; then
-    adb pull /sdcard/Download/SPECTRA-v20 build/model-evidence/filament || exit 1
+    adb pull /sdcard/Download/SPECTRA-v21 build/model-evidence/filament || exit 1
     python3 - <<'PY_CHECK'
 from pathlib import Path
 from PIL import Image
 root = Path('build/model-evidence/filament')
-for version in ('v19', 'v20'):
+for version in ('v20', 'v21'):
     for shot in ('rear', 'cameras', 'bottom', 'top', 'button-side', 'opposite-side', 'volume-closeup', 'smart-key-closeup'):
         file = root / f'white-{version}-{shot}.png'
         with Image.open(file) as image:
@@ -27,7 +27,7 @@ print('All 16 real Android Filament screenshots and load metrics recovered')
 PY_CHECK
     [ "$?" -eq 0 ] || exit 1
 else
-    adb pull /sdcard/Download/SPECTRA-v20 build/model-evidence/filament || true
+    adb pull /sdcard/Download/SPECTRA-v21 build/model-evidence/filament || true
 fi
 adb exec-out screencap -p > build/model-evidence/emulator-screen.png
 exit "$spectra_test_status"

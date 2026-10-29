@@ -31,7 +31,7 @@ class WhiteModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v20/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v21/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -47,14 +47,14 @@ class WhiteModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun whiteV19AndV20RenderInUnmodifiedFilament() {
+    @Test fun whiteV20AndV21RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v19", "v20")) {
-            val source = if (version == "v19") {
-                val file = File(app.cacheDir, "white-v19-test.glb")
-                instrumentation.context.assets.open("models/white-v19.glb").use { input ->
+        for (version in listOf("v20", "v21")) {
+            val source = if (version == "v20") {
+                val file = File(app.cacheDir, "white-v20-test.glb")
+                instrumentation.context.assets.open("models/white-v20.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
@@ -96,7 +96,11 @@ class WhiteModelFilamentTest {
                             val closeup = shot in listOf("volume-closeup", "smart-key-closeup")
                             field(view, "yaw", if (opposite) (PI / 2).toFloat() else (-PI / 2).toFloat())
                             field(view, "pitch", 0f)
-                            field(view, "focusY", if (closeup) .60 else 0.0)
+                            field(view, "focusY", when (shot) {
+                                "volume-closeup" -> .55 // keep the moved power key in frame
+                                "smart-key-closeup" -> .60
+                                else -> 0.0
+                            })
                             // Respect FullOrbit's real 1.6 minimum, including in the test host.
                             field(view, "radius", if (closeup) 1.6f else 4.2f)
                         }
