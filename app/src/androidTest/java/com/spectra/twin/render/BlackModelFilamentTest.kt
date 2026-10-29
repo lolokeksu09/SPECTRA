@@ -31,7 +31,7 @@ class BlackModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-black-v1/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-black-v2/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -47,14 +47,14 @@ class BlackModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun blackV9AndV1RenderInUnmodifiedFilament() {
+    @Test fun blackV1AndV2RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v9", "v1")) {
-            val source = if (version == "v9") {
-                val file = File(app.cacheDir, "black-v9-test.glb")
-                instrumentation.context.assets.open("models/black-v9.glb").use { input ->
+        for (version in listOf("v1", "v2")) {
+            val source = if (version == "v1") {
+                val file = File(app.cacheDir, "black-v1-test.glb")
+                instrumentation.context.assets.open("models/black-v1.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)

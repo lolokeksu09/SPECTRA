@@ -84,11 +84,17 @@ jobs:
           python3 scripts/build-black-v1.py build/model-evidence/white-v23.glb build/model-evidence/black-v9.glb app/src/main/assets/models/legion_y70_black.glb
           python3 scripts/check-black-v1.py build/model-evidence/white-v23.glb build/model-evidence/black-v9.glb app/src/main/assets/models/legion_y70_black.glb --report build/model-evidence/black-v1-checks.json
           cp app/src/main/assets/models/legion_y70_black.glb build/model-evidence/black-v1.glb
+      - name: Refine and verify Black v2 materials
+        run: |
+          cp build/model-evidence/black-v1.glb app/src/androidTest/assets/models/black-v1.glb
+          python3 scripts/refine-black-v2.py build/model-evidence/black-v1.glb app/src/main/assets/models/legion_y70_black.glb
+          python3 scripts/check-black-v2.py build/model-evidence/black-v1.glb app/src/main/assets/models/legion_y70_black.glb --report build/model-evidence/black-v2-checks.json
+          cp app/src/main/assets/models/legion_y70_black.glb build/model-evidence/black-v2.glb
       - name: Khronos glTF validation including normals, UVs and tangent frames
         run: |
           npm install --prefix "$RUNNER_TEMP/gltf-validation" --no-audit --no-fund gltf-validator@2.0.0-dev.3.10
           NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/white-v23.glb build/model-evidence/gltf-validator.json
-          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/black-v1.glb build/model-evidence/black-gltf-validator.json
+          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/black-v2.glb build/model-evidence/black-gltf-validator.json
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Enable KVM for actual Android Filament rendering
@@ -128,8 +134,8 @@ jobs:
         run: |
           cd build/model-evidence && zip -qr ../../SPECTRA-model-verification.zip . && cd ../..
           gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk SPECTRA-model-verification.zip \
-            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · Black v1 · build ${GITHUB_RUN_NUMBER}" \
-            --notes "Black v1: shared corrected white v23 geometry and original black branding/finish. Both models validated and rendered by Android Filament on an API 35 emulator; debug APK tested at ${GITHUB_SHA}. Black v1 has 88,012 triangles vs 22,156 in black v9; physical-device performance is unmeasured. Debug-signed, not production-signed." --prerelease
+            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · Black v2 · build ${GITHUB_RUN_NUMBER}" \
+            --notes "Black v2: shared corrected white v23 geometry, brighter graphite back and refined camera materials. Both models validated and rendered by Android Filament on an API 35 emulator; debug APK tested at ${GITHUB_SHA}. Black v2 has 88,012 triangles vs 22,156 in black v9; physical-device performance is unmeasured. Debug-signed, not production-signed." --prerelease
       - name: Publish tagged development release
         if: startsWith(github.ref, 'refs/tags/v')
         env:

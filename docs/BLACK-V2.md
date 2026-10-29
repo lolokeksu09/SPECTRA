@@ -1,0 +1,5 @@
+# Black v2
+
+Black v2 refines the existing v1 asset and keeps its 99 meshes, positions, topology, normals and UVs. The existing black rear texture is uniformly brightened (including its original LEGION and Lenovo marks); the camera plateau is adjusted to a softer gunmetal finish and engraved ring materials are less reflective. No scene lighting, white-model asset, camera geometry or Android interaction code is changed. The reference photo and emulator use different lighting, so this is an approximation rather than calibrated color.
+
+The pipeline checks shared geometry, the exact texture transform, chassis bounds and antenna positions, validates the v2 GLB, and compares v1/v2 in the production Android Filament view on an API 35 emulator. Filament screenshots should be visually reviewed as well as checked for successful rendering; screenshot existence alone does not prove visual fidelity. Performance and appearance on an actual Legion Y70 remain unverified. Previous APK v0.2.0-dev.56 remains available for rollback.
