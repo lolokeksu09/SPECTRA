@@ -163,7 +163,12 @@ def build(source,target):
     slot = check.geometry['geometry_82']
     assert .00139 < (slot.bounds[1, 0] - slot.bounds[0, 0]) < .00142
     assert .00042 < (slot.bounds[1, 2] - slot.bounds[0, 2]) < .00043
-    assert edges.is_watertight, "exported phone body must stay closed"
+    # Sharp-edge normals deliberately split shared vertices per face, so the
+    # exported mesh itself is not topologically welded. Weld a temporary copy
+    # for the closure check without changing rendering normals in the GLB.
+    welded = edges.copy()
+    welded.merge_vertices()
+    assert welded.is_watertight, "exported phone body must remain geometrically closed"
     vertex_normals=edges.vertex_normals[edges.faces]
     face_normals=edges.face_normals[:,None,:]
     facing=np.sum(vertex_normals*face_normals,axis=2)
