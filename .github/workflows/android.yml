@@ -27,8 +27,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Verify bundled Legion Y70 v9 models
+      - name: Verify baseline Legion Y70 v9 assets
         run: python3 scripts/check-v9-models.py
+      - name: Install Python dependencies for offline model packaging
+        run: python3 -m pip install --disable-pip-version-check numpy==2.3.5 pillow==12.3.0 trimesh==4.11.1
+      - name: Build White v12 mobile 3D model into APK assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/src/main/assets/models/legion_y70_white.glb /tmp/legion_y70_white_v9.glb
+          python3 scripts/build-white-v12-mobile.py \
+            /tmp/legion_y70_white_v9.glb \
+            app/src/main/assets/models/legion_y70_white.glb
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Archive debug APK
