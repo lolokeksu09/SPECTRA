@@ -95,7 +95,8 @@ class WhiteModelFilamentTest {
                             field(view, "yaw", if (shot == "opposite-side") (PI / 2).toFloat() else (-PI / 2).toFloat())
                             field(view, "pitch", 0f)
                             field(view, "focusY", if (shot == "volume-closeup") .60 else 0.0)
-                            field(view, "radius", if (shot == "volume-closeup") 1.05f else 4.2f)
+                            // Respect FullOrbit's real 1.6 minimum, including in the test host.
+                            field(view, "radius", if (shot == "volume-closeup") 1.6f else 4.2f)
                         }
                     }
                     // A nonblank previous frame is not evidence for a new bookmark.
@@ -121,7 +122,7 @@ class WhiteModelFilamentTest {
                             state = JSONObject().put("surface_available", surface.isAvailable)
                                 .put("surface_shown", surface.isShown)
                                 .put("window_visibility", surface.windowVisibility)
-                            for (name in listOf("active", "attached", "disposed", "lastFrame", "frameFailures")) {
+                            for (name in listOf("active", "attached", "disposed", "lastFrame", "frameFailures", "yaw", "pitch", "radius", "focusY")) {
                                 val f = FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }
                                 state.put(name, f.get(view))
                             }
@@ -156,7 +157,10 @@ class WhiteModelFilamentTest {
                                 "rear" -> visibleSpan > pixels.height * .35 && visibleSpan < pixels.height * .85
                                 "button-side", "opposite-side" -> visibleSpan > pixels.height * .40 &&
                                     visibleSpan < pixels.height * .9 && visibleWidth in 8..(pixels.width * .30).toInt()
-                                "volume-closeup" -> visibleSpan > pixels.height * .90 && visibleWidth < pixels.width * .85
+                                // At the actual 1.6 zoom limit, the focused upper side occupies
+                                // ~87% of this 1:2 viewport, rather than extending beyond its top.
+                                "volume-closeup" -> visibleSpan > pixels.height * .80 && visibleSpan < pixels.height * .96 &&
+                                    visibleWidth in (pixels.width * .12).toInt()..(pixels.width * .50).toInt()
                                 else -> visibleSpan > pixels.height * .60
                             }
                         }

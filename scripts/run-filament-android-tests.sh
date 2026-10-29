@@ -7,6 +7,8 @@ adb shell wm dismiss-keyguard
 adb logcat -c
 gradle --no-daemon connectedDebugAndroidTest
 spectra_test_status=$?
+# Gradle uninstall can briefly reconnect ADB; wait before collecting the public evidence.
+timeout 30s adb wait-for-device
 adb logcat -d > build/model-evidence/android-logcat.txt
 # Public MediaStore Downloads survive Gradle's automatic test-app uninstall.
 if [ "$spectra_test_status" -eq 0 ]; then
