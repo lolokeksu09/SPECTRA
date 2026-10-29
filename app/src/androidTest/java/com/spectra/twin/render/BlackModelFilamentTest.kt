@@ -85,6 +85,11 @@ class BlackModelFilamentTest {
                             "top" -> DeviceView.TOP
                             else -> DeviceView.REAR
                         })
+                        if (shot == "rear") {
+                            // showSide is a no-op for the same bookmark; reset after a close-up.
+                            view.showSide(DeviceView.FRONT)
+                            view.showSide(DeviceView.REAR)
+                        }
                         if (shot in listOf("cameras", "camera-oblique")) {
                             field(view, "yaw", if (shot == "camera-oblique") .65f else 0f)
                             field(view, "pitch", -.08f)
