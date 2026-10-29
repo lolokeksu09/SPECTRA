@@ -37,6 +37,19 @@ class SpectraViewModel(app: Application) : AndroidViewModel(app) {
         blackModelUri = value
         visualPrefs.edit().putString("black_glb_uri", value).apply()
     }
+    /** Non-destructive: clear only an imported GLB URI, never diagnostic snapshots. */
+    fun restoreBundledModel(finish: DeviceFinish) {
+        when (finish) {
+            DeviceFinish.WHITE -> {
+                importedModelUri = null
+                visualPrefs.edit().remove("white_glb_uri").apply()
+            }
+            DeviceFinish.BLACK -> {
+                blackModelUri = null
+                visualPrefs.edit().remove("black_glb_uri").apply()
+            }
+        }
+    }
     private val preferences = app.getSharedPreferences("spectra-visual-v1", Context.MODE_PRIVATE)
     var finish by mutableStateOf(DeviceFinish.fromId(preferences.getString("finish", null)))
         private set

@@ -102,7 +102,8 @@ fun SpectraApp(model: SpectraViewModel) {
             when (current) {
                 Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
                     model.importedModelUri, model::importModelUri,
-                    model.blackModelUri, model::importBlackModelUri, model::snapshot)
+                    model.blackModelUri, model::importBlackModelUri,
+                    model::restoreBundledModel, model::snapshot)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history)
@@ -137,6 +138,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onFinishChange: (DeviceFinish) -> Unit,
                        importedModelUri: String?, onImport: (String) -> Unit,
                        blackModelUri: String?, onImportBlack: (String) -> Unit,
+                       onRestoreBundled: (DeviceFinish) -> Unit,
                        onSnapshot: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     val context = LocalContext.current
@@ -254,9 +256,20 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     if (importedModelUri == null) "Импортировать свой GLB" else "Заменить GLB")
             }
         }
+        // Imported models override bundled assets. This reset is explicit,
+        // affects only the chosen finish, and does not erase snapshot history.
+        if ((finish == DeviceFinish.WHITE && importedModelUri != null) ||
+            (finish == DeviceFinish.BLACK && blackModelUri != null && hasBuiltInBlack)) {
+            StableTwinItem {
+                OutlinedButton(
+                    onClick = { onRestoreBundled(finish) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("Вернуться к встроенной модели v9") }
+            }
+        }
         StableTwinItem {
             Caption(
-                if (hasBuiltInBlack) "Белая и чёрная модели GLB встроены в APK. Без подключения к интернету."
+                if (hasBuiltInBlack) "Белая и чёрная 3D-модели Legion Y70 v9 встроены в APK и работают офлайн."
                 else if (blackModelUri == null) "Белый GLB встроен в APK. Для чёрного корпуса выберите GLB из архива один раз. Выбор сохраняется, работа офлайн."
                 else "Белый GLB встроен, чёрный GLB выбран из памяти телефона. Работа офлайн."
             )

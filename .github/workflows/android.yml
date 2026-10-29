@@ -27,6 +27,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
+      - name: Verify bundled Legion Y70 v9 models
+        run: python3 scripts/check-v9-models.py
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Archive debug APK

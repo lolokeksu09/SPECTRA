@@ -1,0 +1,26 @@
+{
+  "legion_y70_white.glb": {
+    "from": "LEGION_Y70_2026_WHITE_v9.glb",
+    "original_sha256": "9d7c9d52464b623fcd5d01ce469f9331208ba9630157807e0453b3bb2f746a4d",
+    "sha256": "e9b7100bcf37679bc0c0b3e05e05374409a1d1d24ddf27139378512bd07bb37d",
+    "bytes": 1585836,
+    "meshes": 91,
+    "triangles": 22156,
+    "normals_added": 91,
+    "degenerate_triangles": 0,
+    "textures": 6,
+    "materials": 79
+  },
+  "legion_y70_black.glb": {
+    "from": "LEGION_Y70_2026_BLACK_v9.glb",
+    "original_sha256": "a4d78798dd390b0725915fc482eec10d366f4f8c3508603767bf58757f404a4e",
+    "sha256": "086c427100982153faffe7b0e3cf15f26d447aa9104e639b68722742a2e93857",
+    "bytes": 2315316,
+    "meshes": 91,
+    "triangles": 22156,
+    "normals_added": 91,
+    "degenerate_triangles": 0,
+    "textures": 6,
+    "materials": 84
+  }
+}
