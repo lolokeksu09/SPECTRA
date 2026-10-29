@@ -49,4 +49,7 @@ dependencies {
     implementation("com.google.android.filament:gltfio-android:$filamentVersion")
     implementation("com.google.android.filament:filament-utils-android:$filamentVersion")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

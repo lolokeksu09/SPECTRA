@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "protected_meshes_exact": 89,
+  "chassis_dimensions_mm": [
+    77.31999456882477,
+    163.95999491214752,
+    8.289999794214964
+  ],
+  "meshes": 101,
+  "triangles_before": 69796,
+  "triangles_after": 81700,
+  "bytes": 4739764,
+  "sha256": "d879058b5c54d521e5192bb104a38cc0c5e08c5a170395a1f5487324a10e797a",
+  "rear_logo_pixels_exact": true,
+  "antenna_centres_mm": [
+    -5.9,
+    5.9
+  ],
+  "hardware_fps_measured": false,
+  "physical_device_tested": false
+}
