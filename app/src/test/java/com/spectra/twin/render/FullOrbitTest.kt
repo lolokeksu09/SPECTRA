@@ -58,4 +58,38 @@ class FullOrbitTest {
         assertEquals(-(rear.eyeZ + 4.0), front.eyeZ + 4.0, 0.0001)
         assertEquals(1.0, front.upY, 0.0001)
     }
+    @Test fun bottomCloseUpTargetsPhysicalNegativeYEnd() {
+        val preset = DeviceView.BOTTOM
+        val pose = FullOrbit.camera(
+            preset.filamentYaw(), preset.filamentPitch(),
+            preset.filamentDistance(), -4.0, preset.filamentFocusY()
+        )
+        assertEquals(-.88, pose.focusY, .000001)
+        assertTrue(pose.eyeY < -2.7)
+        assertTrue("bottom preset must be closer than a full-body view",
+            preset.filamentDistance() < DeviceView.REAR.filamentDistance())
+        assertTrue("bottom view should keep phone horizontal in frame", pose.upZ > .95)
+    }
+
+    @Test fun topCloseUpTargetsPhysicalPositiveYEnd() {
+        val preset = DeviceView.TOP
+        val pose = FullOrbit.camera(
+            preset.filamentYaw(), preset.filamentPitch(),
+            preset.filamentDistance(), -4.0, preset.filamentFocusY()
+        )
+        assertEquals(.88, pose.focusY, .000001)
+        assertTrue(pose.eyeY > 2.7)
+        assertTrue(pose.upZ < -.95)
+    }
+
+    @Test fun regularFrontAndRearReturnToCenteredFrame() {
+        for (side in listOf(DeviceView.REAR, DeviceView.FRONT)) {
+            val pose = FullOrbit.camera(
+                side.filamentYaw(), side.filamentPitch(), side.filamentDistance(),
+                -4.0, side.filamentFocusY()
+            )
+            assertEquals(0.0, pose.focusY, .000001)
+            assertEquals(4.2f, side.filamentDistance(), .000001f)
+        }
+    }
 }

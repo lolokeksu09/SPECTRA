@@ -215,6 +215,30 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
             }
         }
         StableTwinItem {
+            // Dedicated close-up views let the user see the USB-C port, SIM
+            // tray, speaker and Dolby mark rather than a tiny edge-on sliver.
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = viewSide == DeviceView.BOTTOM,
+                    onClick = { viewSide = DeviceView.BOTTOM },
+                    label = { Text("Снизу") },
+                    leadingIcon = {
+                        Icon(Icons.Filled.ArrowDownward, contentDescription = null, Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("view_bottom")
+                )
+                FilterChip(
+                    selected = viewSide == DeviceView.TOP,
+                    onClick = { viewSide = DeviceView.TOP },
+                    label = { Text("Сверху") },
+                    leadingIcon = {
+                        Icon(Icons.Filled.ArrowUpward, contentDescription = null, Modifier.size(16.dp))
+                    },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("view_top")
+                )
+            }
+        }
+        StableTwinItem {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("ЦВЕТ КОРПУСА", style = MaterialTheme.typography.labelMedium, color = Muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {

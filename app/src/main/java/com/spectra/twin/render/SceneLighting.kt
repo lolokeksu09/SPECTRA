@@ -12,7 +12,7 @@ internal object SceneLighting {
 
     fun keyDirection(camera: OrbitPose, focusZ: Double): LightRay {
         val dx = -camera.eyeX
-        val dy = -camera.eyeY
+        val dy = camera.focusY - camera.eyeY
         val dz = focusZ - camera.eyeZ
         val distance = sqrt(dx * dx + dy * dy + dz * dz)
         val offset = SCREEN_UP_BIAS * distance

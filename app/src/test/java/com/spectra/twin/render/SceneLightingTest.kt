@@ -39,4 +39,18 @@ class SceneLightingTest {
         assertTrue("Underside requires rays travelling upward", below.y > 0.95)
         assertTrue("Top edge requires rays travelling downward", above.y < -0.95)
     }
+    @Test fun closeUpLightingPointsAtFocusedBottomEndNotSceneOrigin() {
+        val preset = DeviceView.BOTTOM
+        val pose = FullOrbit.camera(
+            preset.filamentYaw(), preset.filamentPitch(),
+            preset.filamentDistance(), focusZ, preset.filamentFocusY()
+        )
+        val light = SceneLighting.keyDirection(pose, focusZ)
+        assertTrue("bottom face must be lit from below", light.y > .95f)
+        val relativeY = pose.eyeY - pose.focusY
+        val relativeZ = pose.eyeZ - focusZ
+        val distance = sqrt(pose.eyeX*pose.eyeX + relativeY*relativeY + relativeZ*relativeZ)
+        val ndotl = -(pose.eyeX*light.x + relativeY*light.y + relativeZ*light.z)/distance
+        assertTrue("lighting must follow the focused part", ndotl > .95)
+    }
 }

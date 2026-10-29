@@ -24,21 +24,25 @@ object FullOrbit {
         }
     }
 
-    fun camera(yaw: Float, pitch: Float, radius: Float, focusZ: Double): OrbitPose {
+    fun camera(
+        yaw: Float, pitch: Float, radius: Float, focusZ: Double,
+        focusY: Double = 0.0
+    ): OrbitPose {
         val horizontal = wrap(yaw).toDouble()
         val vertical = wrap(pitch).toDouble()
         val c = cos(vertical)
         val s = sin(vertical)
         val hSin = sin(horizontal)
         val hCos = cos(horizontal)
-        val r = radius.coerceIn(2.9f, 8f).toDouble()
+        val r = radius.coerceIn(1.6f, 8f).toDouble()
         return OrbitPose(
             eyeX = r * c * hSin,
-            eyeY = r * s,
+            eyeY = focusY + r * s,
             eyeZ = focusZ + r * c * hCos,
             upX = -s * hSin,
             upY = c,
-            upZ = -s * hCos
+            upZ = -s * hCos,
+            focusY = focusY
         )
     }
 }
@@ -50,5 +54,6 @@ data class OrbitPose(
     val eyeZ: Double,
     val upX: Double,
     val upY: Double,
-    val upZ: Double
+    val upZ: Double,
+    val focusY: Double
 )

@@ -55,12 +55,13 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private var x = 0f
     private var y = 0f
     private val focusZ = -4.0
+    private var focusY = 0.0
     var onStatus: (String?) -> Unit = {}
 
     private val pinch = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val factor = detector.scaleFactor
-            if (factor.isFinite() && factor > 0f) radius = (radius / factor).coerceIn(2.9f, 8f)
+            if (factor.isFinite() && factor > 0f) radius = (radius / factor).coerceIn(1.6f, 8f)
             return true
         }
     })
@@ -75,10 +76,10 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 // Camera updates and rendering both touch Filament native state.
                 // Keep them behind the same recoverable error boundary.
                 try {
-                    val pose = FullOrbit.camera(yaw, pitch, radius, focusZ)
+                    val pose = FullOrbit.camera(yaw, pitch, radius, focusZ, focusY)
                     viewer.camera.lookAt(
                         pose.eyeX, pose.eyeY, pose.eyeZ,
-                        0.0, 0.0, focusZ,
+                        0.0, pose.focusY, focusZ,
                         pose.upX, pose.upY, pose.upZ
                     )
                     // Filament uses only the strongest directional light by
@@ -201,7 +202,10 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         if (lastSide == side) return
         lastSide = side
         yaw = side.filamentYaw()
-        pitch = -.10f
+        pitch = side.filamentPitch()
+        focusY = side.filamentFocusY()
+        radius = side.filamentDistance()
+        lastTouchNs = System.nanoTime()
     }
 
     fun setSource(uri: Uri?, finish: DeviceFinish) {
