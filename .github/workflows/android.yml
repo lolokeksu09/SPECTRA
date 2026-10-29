@@ -31,7 +31,7 @@ jobs:
         run: python3 scripts/check-v9-models.py
       - name: Install Python dependencies for offline model packaging
         run: python3 -m pip install --disable-pip-version-check numpy==2.3.5 pillow==12.3.0 trimesh==4.11.1
-      - name: Build White v15 mobile 3D model into APK assets
+      - name: Build validated White v15 base into APK assets
         shell: bash
         run: |
           set -euo pipefail
@@ -39,6 +39,8 @@ jobs:
           python3 scripts/build-white-v15-mobile.py \
             /tmp/legion_y70_white_v9.glb \
             app/src/main/assets/models/legion_y70_white.glb
+      - name: Refine White v16 camera and antenna geometry
+        run: python3 scripts/refine-white-v16.py app/src/main/assets/models/legion_y70_white.glb
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Archive debug APK
