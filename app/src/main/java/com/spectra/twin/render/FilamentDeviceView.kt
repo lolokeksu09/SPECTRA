@@ -9,8 +9,7 @@ import android.view.ScaleGestureDetector
 import android.view.TextureView
 import android.widget.FrameLayout
 import com.google.android.filament.View
-import com.google.android.filament.EntityManager
-import com.google.android.filament.LightManager
+import com.google.android.filament.IndirectLight
 import com.google.android.filament.utils.ModelViewer
 import com.google.android.filament.utils.Utils
 import kotlinx.coroutines.*
@@ -34,7 +33,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     // Android 16 drivers a SurfaceView can leave garbage pixels outside the model.
     private val surface = TextureView(context).apply { isOpaque = true }
     private val viewer: ModelViewer
-    private var fillLight: Int = 0
+    private var studioAmbient: IndirectLight? = null
     private var nativeReleased = false
     private val scheduler = Choreographer.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -116,12 +115,13 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 generation++
                 loadJob?.cancel()
                 scope.cancel()
-                if (!nativeReleased && fillLight != 0) {
+                if (!nativeReleased) {
                     nativeReleased = true
-                    viewer.scene.removeEntity(fillLight)
-                    viewer.engine.destroyEntity(fillLight)
-                    EntityManager.get().destroy(fillLight)
-                    fillLight = 0
+                    // This listener precedes ModelViewer's own engine teardown.
+                    // Detach scene references before destroying native resources.
+                    viewer.scene.indirectLight = null
+                    studioAmbient?.let { viewer.engine.destroyIndirectLight(it) }
+                    studioAmbient = null
                 }
             }
         })
@@ -137,6 +137,16 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
             clearColor = doubleArrayOf(0.012, 0.016, 0.024, 1.0)
         }
         viewer.scene.skybox = null
+        // The black scene has no environment map. Directional light alone
+        // cannot illuminate the PBR perimeter and port recesses consistently,
+        // especially while inspecting the top and bottom. A single constant
+        // spherical-harmonic environment adds diffuse fill from ALL directions
+        // without downloading a cubemap or turning the phone emissive.
+        studioAmbient = IndirectLight.Builder()
+            .irradiance(1, floatArrayOf(1f, 1f, 1f))
+            .intensity(26_000f)
+            .build(viewer.engine)
+        viewer.scene.indirectLight = studioAmbient
         // GPU compatibility: disabling only bloom, AO, and dynamic scaling
         // still leaves Filament's intermediate post-processing buffers active.
         // Filament upstream documents corrupted/tearing pixels on Android
@@ -154,16 +164,6 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         viewer.engine.lightManager.setDirection(
             viewer.engine.lightManager.getInstance(viewer.light), -.3f, -.6f, -.8f
         )
-        // Legacy secondary directional fill; default Filament evaluates only
-        // the dominant directional light. The orbit-aware key above provides
-        // illumination on each side without requiring extra scene lights.
-        fillLight = EntityManager.get().create()
-        LightManager.Builder(LightManager.Type.DIRECTIONAL)
-            .direction(.25f, -.45f, .85f)
-            .intensity(42_000f)
-            .castShadows(false)
-            .build(viewer.engine, fillLight)
-        viewer.scene.addEntity(fillLight)
         surface.setOnTouchListener { _, event -> handleTouch(event) }
         contentDescription = "3D-модель Lenovo Legion Y70. Вращение на 360 градусов по горизонтали и вертикали одним пальцем, масштаб двумя."
     }
