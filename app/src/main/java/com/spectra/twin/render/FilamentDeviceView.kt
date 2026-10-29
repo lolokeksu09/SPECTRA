@@ -81,6 +81,14 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                         0.0, 0.0, focusZ,
                         pose.upX, pose.upY, pose.upZ
                     )
+                    // Filament uses only the strongest directional light by
+                    // default. Orbit-aware lighting prevents the physical
+                    // underside (-Y) from going black when viewed from below.
+                    val key = SceneLighting.keyDirection(pose, focusZ)
+                    viewer.engine.lightManager.setDirection(
+                        viewer.engine.lightManager.getInstance(viewer.light),
+                        key.x, key.y, key.z
+                    )
                     viewer.render(ns)
                     frameFailures = 0
                 } catch (e: Exception) {
@@ -145,7 +153,9 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         viewer.engine.lightManager.setDirection(
             viewer.engine.lightManager.getInstance(viewer.light), -.3f, -.6f, -.8f
         )
-        // Back face was almost black: the default sun lights only one side.
+        // Legacy secondary directional fill; default Filament evaluates only
+        // the dominant directional light. The orbit-aware key above provides
+        // illumination on each side without requiring extra scene lights.
         fillLight = EntityManager.get().create()
         LightManager.Builder(LightManager.Type.DIRECTIONAL)
             .direction(.25f, -.45f, .85f)
