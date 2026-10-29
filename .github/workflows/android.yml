@@ -71,9 +71,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
-          script: |
-            gradle --no-daemon connectedDebugAndroidTest
-            adb pull /sdcard/Android/data/com.spectra.twin/files/white-v18-evidence build/model-evidence/filament
+          script: bash scripts/run-filament-android-tests.sh
       - name: Archive model and Android verification evidence
         if: always()
         uses: actions/upload-artifact@v4

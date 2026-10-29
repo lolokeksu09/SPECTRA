@@ -69,33 +69,54 @@ class WhiteModelFilamentTest {
                             field(view, "radius", 1.3f)
                         }
                     }
-                    // Allow actual rendered frames and texture upload, not a Compose preview.
-                    SystemClock.sleep(1400)
-                    var bitmap: Bitmap? = null
-                    scenario.onActivity { activity ->
-                        assertNull(activity.modelError)
-                        val surface = activity.model.getChildAt(0) as TextureView
-                        assertTrue("TextureView surface unavailable", surface.isAvailable)
-                        bitmap = surface.bitmap
-                    }
-                    val pixels = requireNotNull(bitmap) { "GPU readback unavailable" }
-                    assertTrue(pixels.width >= 300 && pixels.height >= 300)
+                    // CPU-side gltfio load completion precedes the first GPU frame.
+                    // Wait for visible GPU output with a deadline; retain failure evidence too.
+                    val frameLimit = SystemClock.uptimeMillis() + 30_000
                     var visible = 0
                     var dark = 0
-                    // Basic nonblank/output guard; human visual assessment remains separate.
-                    for (y in 0 until pixels.height step 4) for (x in 0 until pixels.width step 4) {
-                        val p = pixels.getPixel(x, y)
-                        val r = (p shr 16) and 255
-                        val g = (p shr 8) and 255
-                        val b = p and 255
-                        if (r > 65 || g > 65 || b > 65) visible++ else dark++
-                    }
-                    assertTrue("$version/$shot blank render", visible > 150)
-                    assertTrue("$version/$shot missing background", dark > 150)
+                    var lastPixels: Bitmap? = null
+                    var state = JSONObject()
+                    do {
+                        SystemClock.sleep(300)
+                        var bitmap: Bitmap? = null
+                        scenario.onActivity { activity ->
+                            assertNull(activity.modelError)
+                            val view = activity.model
+                            val surface = view.getChildAt(0) as TextureView
+                            state = JSONObject().put("surface_available", surface.isAvailable)
+                                .put("surface_shown", surface.isShown)
+                                .put("window_visibility", surface.windowVisibility)
+                            for (name in listOf("active", "attached", "disposed", "lastFrame", "frameFailures")) {
+                                val f = FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }
+                                state.put(name, f.get(view))
+                            }
+                            if (surface.isAvailable) bitmap = surface.bitmap
+                        }
+                        bitmap?.let { pixels ->
+                            lastPixels?.recycle()
+                            lastPixels = pixels
+                            visible = 0
+                            dark = 0
+                            for (y in 0 until pixels.height step 4) for (x in 0 until pixels.width step 4) {
+                                val p = pixels.getPixel(x, y)
+                                val r = (p shr 16) and 255
+                                val g = (p shr 8) and 255
+                                val b = p and 255
+                                if (r > 65 || g > 65 || b > 65) visible++ else dark++
+                            }
+                        }
+                    } while ((visible <= 150 || dark <= 150) && SystemClock.uptimeMillis() < frameLimit)
+                    state.put("visible_samples", visible).put("dark_samples", dark)
+                    File(evidence, "white-$version-$shot-state.json").writeText(state.toString(2))
+                    File(evidence, "android-load-metrics.json").writeText(metrics.toString(2))
+                    val pixels = requireNotNull(lastPixels) { "GPU readback unavailable: $state" }
                     File(evidence, "white-$version-$shot.png").outputStream().use {
                         assertTrue(pixels.compress(Bitmap.CompressFormat.PNG, 100, it))
                     }
+                    assertTrue(pixels.width >= 300 && pixels.height >= 300)
                     pixels.recycle()
+                    assertTrue("$version/$shot blank render: $state", visible > 150)
+                    assertTrue("$version/$shot missing background: $state", dark > 150)
                 }
             }
         }
