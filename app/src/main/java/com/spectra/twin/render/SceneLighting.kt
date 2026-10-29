@@ -15,7 +15,11 @@ internal object SceneLighting {
         val dy = camera.focusY - camera.eyeY
         val dz = focusZ - camera.eyeZ
         val distance = sqrt(dx * dx + dy * dy + dz * dz)
-        val offset = SCREEN_UP_BIAS * distance
+        // Detailed top/bottom inspections need a nearly frontal light: the
+        // chassis end face is only ~1 cm thick in the source asset.
+        // Preserve the more sculpted light for ordinary front/rear views.
+        val bias = if (kotlin.math.abs(camera.focusY) > 0.5) 0.10 else SCREEN_UP_BIAS
+        val offset = bias * distance
         val x = dx - camera.upX * offset
         val y = dy - camera.upY * offset
         val z = dz - camera.upZ * offset
