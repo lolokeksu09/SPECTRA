@@ -31,7 +31,7 @@ class WhiteModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v22/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v23/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -47,14 +47,14 @@ class WhiteModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun whiteV21AndV22RenderInUnmodifiedFilament() {
+    @Test fun whiteV22AndV23RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v21", "v22")) {
-            val source = if (version == "v21") {
-                val file = File(app.cacheDir, "white-v21-test.glb")
-                instrumentation.context.assets.open("models/white-v21.glb").use { input ->
+        for (version in listOf("v22", "v23")) {
+            val source = if (version == "v22") {
+                val file = File(app.cacheDir, "white-v22-test.glb")
+                instrumentation.context.assets.open("models/white-v22.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
