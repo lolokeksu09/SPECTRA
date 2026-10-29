@@ -1,0 +1,7 @@
+# Black v1
+
+Use the existing v23 white handset export as the exact shared geometry for the black model, as requested. Map the existing black v9 finish onto that geometry, including its original rear texture with LEGION and Lenovo and its front/Dolby images. Keep the corrected optical glass and LYTIA marking. Use dark metallic rings, a fine-grained gunmetal camera face, dark side keys and subtle dark antenna inserts. Preserve the v23 white asset unchanged.
+
+The user's `3491.png` reference shows a dark textured back and dark lettering, a gray camera plateau, raised left cameras, and flatter right circles. Color response varies with lighting; this is not a measured color calibration. The black v9 baked rear texture remains intact, including its printed marks, and adds the existing subtle normal and roughness maps. No generated illustration or rebuilt phone is used.
+
+CI verifies all 99 black meshes against white v23 positions/faces/normals/UVs and validates retained black texture pixels, dark rail, dimensions, USB seams and glTF structure. Android instrumentation compares original black v9 with black v1 in the production Filament view, in addition to the existing white tests. The 88,012 triangles in black v1 are about four times v9's 22,156; a real-device FPS/battery measurement has not been made. No production viewer, lighting or gesture code changes. Previous debug release `v0.2.0-dev.53` is available for recovery.
