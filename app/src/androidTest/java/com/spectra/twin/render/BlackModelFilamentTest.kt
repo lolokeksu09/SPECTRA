@@ -77,7 +77,7 @@ class BlackModelFilamentTest {
                 metrics.put(JSONObject().put("version", version).put("gltfio_load_ms", loadMs)
                     .put("process_pss_kib", memory.totalPss)
                     .put("environment", "Android API 35 emulator / SwiftShader; not Legion hardware"))
-                for (shot in listOf("rear", "cameras", "camera-oblique", "bottom", "top", "button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
+                for (shot in listOf("cameras", "rear", "camera-oblique", "bottom", "top", "button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
                     scenario.onActivity { activity ->
                         val view = activity.model
                         view.showSide(when (shot) {
@@ -115,6 +115,7 @@ class BlackModelFilamentTest {
                     var dark = 0
                     var visibleSpan = 0
                     var visibleWidth = 0
+                    var rearCameraSamples = 0
                     var correctShape = false
                     var lastPixels: Bitmap? = null
                     var state = JSONObject()
@@ -139,6 +140,7 @@ class BlackModelFilamentTest {
                             lastPixels = pixels
                             visible = 0
                             dark = 0
+                            rearCameraSamples = 0
                             var minY = pixels.height
                             var maxY = -1
                             var minX = pixels.width
@@ -148,6 +150,11 @@ class BlackModelFilamentTest {
                                 val r = (p shr 16) and 255
                                 val g = (p shr 8) and 255
                                 val b = p and 255
+                                // The dark front can have the same silhouette as the rear.
+                                // Require the bright camera island in the upper-left rear area.
+                                if (shot == "rear" && x >= pixels.width * .25 && x < pixels.width * .60 &&
+                                    y >= pixels.height * .20 && y < pixels.height * .40 &&
+                                    (r > 45 || g > 45 || b > 45)) rearCameraSamples++
                                 if (r > 20 || g > 20 || b > 20) {
                                     visible++
                                     minY = minOf(minY, y)
@@ -160,7 +167,7 @@ class BlackModelFilamentTest {
                             visibleWidth = maxX - minX
                             correctShape = when (shot) {
                                 "bottom", "top" -> visibleSpan in 10..(pixels.height * .30).toInt()
-                                "rear" -> visibleSpan > pixels.height * .35 && visibleSpan < pixels.height * .85
+                                "rear" -> visibleSpan > pixels.height * .35 && visibleSpan < pixels.height * .85 && rearCameraSamples > 80
                                 "button-side", "opposite-side" -> visibleSpan > pixels.height * .40 &&
                                     visibleSpan < pixels.height * .9 && visibleWidth in 8..(pixels.width * .30).toInt()
                                 // At the actual 1.6 zoom limit, the focused upper side occupies
@@ -172,6 +179,7 @@ class BlackModelFilamentTest {
                         }
                     } while ((visible <= 150 || dark <= 150 || !correctShape) && SystemClock.uptimeMillis() < frameLimit)
                     state.put("visible_samples", visible).put("dark_samples", dark)
+                        .put("rear_camera_samples", rearCameraSamples)
                         .put("visible_span_pixels", visibleSpan).put("visible_width_pixels", visibleWidth)
                         .put("correct_bookmark_shape", correctShape)
                     saveJson("black-$version-$shot-state.json", state.toString(2))
