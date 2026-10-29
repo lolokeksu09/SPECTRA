@@ -190,7 +190,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp)
                 ) {
-                    Text("Поверните жестом · масштаб — двумя пальцами",
+                    Text("Вращение 360° по двум осям · масштаб двумя пальцами",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
                 }

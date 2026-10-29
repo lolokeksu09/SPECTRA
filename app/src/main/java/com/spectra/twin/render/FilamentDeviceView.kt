@@ -16,8 +16,6 @@ import com.google.android.filament.utils.Utils
 import kotlinx.coroutines.*
 import java.nio.ByteBuffer
 import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * GLB-backed offline Y70 viewer. No procedural meshes, network or root.
@@ -74,14 +72,15 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                     loadJob?.isActive == true) 33_000_000L else 100_000_000L
             if (ns - lastFrame >= interval) {
                 lastFrame = ns
-                val c = cos(pitch)
-                val eyeX = radius * c * sin(yaw)
-                val eyeY = radius * sin(pitch)
-                val eyeZ = focusZ + radius * c * cos(yaw)
                 // Camera updates and rendering both touch Filament native state.
                 // Keep them behind the same recoverable error boundary.
                 try {
-                    viewer.camera.lookAt(eyeX.toDouble(),eyeY.toDouble(),eyeZ.toDouble(),0.0,0.0,focusZ,0.0,1.0,0.0)
+                    val pose = FullOrbit.camera(yaw, pitch, radius, focusZ)
+                    viewer.camera.lookAt(
+                        pose.eyeX, pose.eyeY, pose.eyeZ,
+                        0.0, 0.0, focusZ,
+                        pose.upX, pose.upY, pose.upZ
+                    )
                     viewer.render(ns)
                     frameFailures = 0
                 } catch (e: Exception) {
@@ -155,7 +154,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
             .build(viewer.engine, fillLight)
         viewer.scene.addEntity(fillLight)
         surface.setOnTouchListener { _, event -> handleTouch(event) }
-        contentDescription = "3D-модель Lenovo Legion Y70. Поворот одним пальцем, масштаб двумя."
+        contentDescription = "3D-модель Lenovo Legion Y70. Вращение на 360 градусов по горизонтали и вертикали одним пальцем, масштаб двумя."
     }
 
     private fun handleTouch(event: MotionEvent): Boolean {
@@ -171,8 +170,8 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!pinch.isInProgress && event.pointerCount == 1) {
-                    yaw = (yaw + (event.x - x) * .008f) % (2f * PI.toFloat())
-                    pitch = (pitch + (event.y - y) * .006f).coerceIn(-1.15f, 1.15f)
+                    yaw = FullOrbit.wrap(yaw + (event.x - x) * .008f)
+                    pitch = FullOrbit.wrap(pitch + (event.y - y) * .006f)
                 }
                 x = event.getX(0); y = event.getY(0)
             }
