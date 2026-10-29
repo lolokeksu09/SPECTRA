@@ -1,14 +1,18 @@
 package com.spectra.twin.render
 
+import android.content.ContentValues
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import android.os.Debug
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.TextureView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.io.OutputStream
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,6 +22,25 @@ import org.json.JSONObject
 /** Real Android Filament/gltfio loading + GPU output; this does not certify the Legion hardware. */
 @RunWith(AndroidJUnit4::class)
 class WhiteModelFilamentTest {
+    private val evidenceUris = mutableMapOf<String, Uri>()
+
+    private fun saveEvidence(name: String, mime: String, writer: (OutputStream) -> Unit) {
+        val resolver = InstrumentationRegistry.getInstrumentation().targetContext.contentResolver
+        val uri = evidenceUris.getOrPut(name) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.MIME_TYPE, mime)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v18/")
+            }
+            requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
+        }
+        requireNotNull(resolver.openOutputStream(uri, "wt")).use(writer)
+    }
+
+    private fun saveJson(name: String, text: String) {
+        saveEvidence(name, "application/json") { it.write(text.toByteArray(Charsets.UTF_8)) }
+    }
+
     private fun field(view: FilamentDeviceView, name: String, value: Any) {
         // Confined to the test APK: never modify production camera or lighting code for screenshots.
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
@@ -26,7 +49,6 @@ class WhiteModelFilamentTest {
     @Test fun whiteV17AndV18RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
-        val evidence = File(app.getExternalFilesDir(null), "white-v18-evidence").apply { mkdirs() }
         val metrics = JSONArray()
         for (version in listOf("v17", "v18")) {
             val source = if (version == "v17") {
@@ -107,10 +129,10 @@ class WhiteModelFilamentTest {
                         }
                     } while ((visible <= 150 || dark <= 150) && SystemClock.uptimeMillis() < frameLimit)
                     state.put("visible_samples", visible).put("dark_samples", dark)
-                    File(evidence, "white-$version-$shot-state.json").writeText(state.toString(2))
-                    File(evidence, "android-load-metrics.json").writeText(metrics.toString(2))
+                    saveJson("white-$version-$shot-state.json", state.toString(2))
+                    saveJson("android-load-metrics.json", metrics.toString(2))
                     val pixels = requireNotNull(lastPixels) { "GPU readback unavailable: $state" }
-                    File(evidence, "white-$version-$shot.png").outputStream().use {
+                    saveEvidence("white-$version-$shot.png", "image/png") {
                         assertTrue(pixels.compress(Bitmap.CompressFormat.PNG, 100, it))
                     }
                     assertTrue(pixels.width >= 300 && pixels.height >= 300)
@@ -120,6 +142,6 @@ class WhiteModelFilamentTest {
                 }
             }
         }
-        File(evidence, "android-load-metrics.json").writeText(metrics.toString(2))
+        saveJson("android-load-metrics.json", metrics.toString(2))
     }
 }
