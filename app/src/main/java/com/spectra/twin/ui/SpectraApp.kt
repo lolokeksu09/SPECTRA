@@ -293,7 +293,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         }
         StableTwinItem {
             Caption(
-                if (hasBuiltInBlack) "Встроены офлайн: белая модель Legion Y70 v13 и чёрная v9."
+                if (hasBuiltInBlack) "Встроены офлайн: белая модель Legion Y70 v14 и чёрная v9."
                 else if (blackModelUri == null) "Белый GLB встроен в APK. Для чёрного корпуса выберите GLB из архива один раз. Выбор сохраняется, работа офлайн."
                 else "Белый GLB встроен, чёрный GLB выбран из памяти телефона. Работа офлайн."
             )
