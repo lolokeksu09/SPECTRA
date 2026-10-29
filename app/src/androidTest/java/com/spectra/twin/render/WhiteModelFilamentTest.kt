@@ -31,7 +31,7 @@ class WhiteModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v21/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-v22/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -47,14 +47,14 @@ class WhiteModelFilamentTest {
         FilamentDeviceView::class.java.getDeclaredField(name).apply { isAccessible = true }.set(view, value)
     }
 
-    @Test fun whiteV20AndV21RenderInUnmodifiedFilament() {
+    @Test fun whiteV21AndV22RenderInUnmodifiedFilament() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v20", "v21")) {
-            val source = if (version == "v20") {
-                val file = File(app.cacheDir, "white-v20-test.glb")
-                instrumentation.context.assets.open("models/white-v20.glb").use { input ->
+        for (version in listOf("v21", "v22")) {
+            val source = if (version == "v21") {
+                val file = File(app.cacheDir, "white-v21-test.glb")
+                instrumentation.context.assets.open("models/white-v21.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
@@ -77,7 +77,7 @@ class WhiteModelFilamentTest {
                 metrics.put(JSONObject().put("version", version).put("gltfio_load_ms", loadMs)
                     .put("process_pss_kib", memory.totalPss)
                     .put("environment", "Android API 35 emulator / SwiftShader; not Legion hardware"))
-                for (shot in listOf("rear", "cameras", "bottom", "top", "button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
+                for (shot in listOf("rear", "cameras", "camera-oblique", "bottom", "top", "button-side", "opposite-side", "volume-closeup", "smart-key-closeup")) {
                     scenario.onActivity { activity ->
                         val view = activity.model
                         view.showSide(when (shot) {
@@ -85,8 +85,8 @@ class WhiteModelFilamentTest {
                             "top" -> DeviceView.TOP
                             else -> DeviceView.REAR
                         })
-                        if (shot == "cameras") {
-                            field(view, "yaw", 0f)
+                        if (shot in listOf("cameras", "camera-oblique")) {
+                            field(view, "yaw", if (shot == "camera-oblique") .65f else 0f)
                             field(view, "pitch", -.08f)
                             field(view, "focusY", .67)
                             field(view, "radius", 2.15f)

@@ -1,0 +1,7 @@
+# White v22 — camera elevation
+
+The white device photograph https://cdn.mobilecity.vn/mobilecity-vn/images/2026/05/danh-gia-lenovo-legion-y70-2026-camera.jpg shows two left optical barrels raised above the silver island and the right sensor/flash surrounded by nearly flush concentric decoration. v21 placed the right details up to approximately 0.36 mm above the camera-island face, reducing that contrast.
+
+The existing v21 geometry and texture images are reused. The two left optical assemblies are stretched only in depth relative to the island plane, from roughly 0.74 mm to 1.00 mm peak rise; the right sensor/flash assembly depth is reduced to about 0.07 mm peak rise. That small residual lift maintains separation of layered surfaces in glTF/Filament. Per-vertex X/Y positions, mesh topology, UVs, texture pixels, material factors, chassis, side keys, USB seams, logos, and black asset remain unchanged. These are photo-guided visual approximations, not dimensions measured from the hardware.
+
+Build app assets through v9→v15→v17→v18→v19→v20→v21→v22. The v22 checker validates actual vertex depth, untouched vertices and materials, XY coordinates, normals, GLB budgets, chassis dimensions and black hash; Khronos validation follows. Android instrumentation compares v21 and the packaged v22 with the production Filament viewer on an API 35 emulator, including a camera oblique view. Rendering and lighting code remain untouched. Emulator results do not establish behavior on physical Legion Y70 hardware. The prior dev.51 APK is the recovery version.

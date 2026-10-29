@@ -61,16 +61,21 @@ jobs:
           python3 scripts/refine-white-v20.py build/model-evidence/white-v19.glb app/src/main/assets/models/legion_y70_white.glb
           python3 scripts/check-white-v20.py build/model-evidence/white-v19.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v20-checks.json
           cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v20.glb
-          cp build/model-evidence/white-v20.glb app/src/androidTest/assets/models/white-v20.glb
       - name: Refine and verify White v21 side details
         run: |
           python3 scripts/refine-white-v21.py build/model-evidence/white-v20.glb app/src/main/assets/models/legion_y70_white.glb
           python3 scripts/check-white-v21.py build/model-evidence/white-v20.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v21-checks.json
           cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v21.glb
+          cp build/model-evidence/white-v21.glb app/src/androidTest/assets/models/white-v21.glb
+      - name: Refine and validate White v22 camera elevations
+        run: |
+          python3 scripts/refine-white-v22.py build/model-evidence/white-v21.glb app/src/main/assets/models/legion_y70_white.glb
+          python3 scripts/check-white-v22.py build/model-evidence/white-v21.glb app/src/main/assets/models/legion_y70_white.glb --report build/model-evidence/v22-checks.json
+          cp app/src/main/assets/models/legion_y70_white.glb build/model-evidence/white-v22.glb
       - name: Khronos glTF validation including normals, UVs and tangent frames
         run: |
           npm install --prefix "$RUNNER_TEMP/gltf-validation" --no-audit --no-fund gltf-validator@2.0.0-dev.3.10
-          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/white-v21.glb build/model-evidence/gltf-validator.json
+          NODE_PATH="$RUNNER_TEMP/gltf-validation/node_modules" node scripts/validate-glb.cjs build/model-evidence/white-v22.glb build/model-evidence/gltf-validator.json
       - name: Test and build
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Enable KVM for actual Android Filament rendering
@@ -78,7 +83,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Android Filament v20 and v21 render regression with all side keys
+      - name: Android Filament v21 and v22 render regression with all side keys
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -91,7 +96,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: White-v21-verification
+          name: White-v22-verification
           path: |
             build/model-evidence/
             app/build/reports/tests/
@@ -108,10 +113,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd build/model-evidence && zip -qr ../../White-v21-verification.zip . && cd ../..
-          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk White-v21-verification.zip \
-            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · White v21 · build ${GITHUB_RUN_NUMBER}" \
-            --notes "White v21: photo-guided volume rocker and power key proportions, adjusted opposite key and upper side antenna positions, with muted gray side inserts. Estimates based on photos, not measured factory CAD. Debug APK unit-tested and rendered using Android Filament on API 35 emulator at commit ${GITHUB_SHA}. Includes before/after GLBs, geometry checks and 16 Filament screenshots. Physical Legion Y70 testing and hardware FPS remain pending. Debug-signed, not production-signed." --prerelease
+          cd build/model-evidence && zip -qr ../../White-v22-verification.zip . && cd ../..
+          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk White-v22-verification.zip \
+            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · White v22 · build ${GITHUB_RUN_NUMBER}" \
+            --notes "White v22: raised left optical assemblies and near-flush right sensor/flash rings, preserving camera centres and materials. Debug APK unit-tested and rendered using Android Filament on API 35 emulator at commit ${GITHUB_SHA}. Includes before/after GLBs, geometry checks and 18 Filament screenshots. Physical Legion Y70 testing and hardware FPS remain pending. Debug-signed, not production-signed." --prerelease
       - name: Publish tagged development release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
