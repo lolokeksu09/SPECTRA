@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.spectra.twin.core.DeviceCapabilities
+import com.spectra.twin.core.CameraCapability
 import com.spectra.twin.core.PassportSnapshot
 import com.spectra.twin.core.PassportStore
 import org.junit.Assert.*
@@ -63,6 +64,29 @@ class PassportUiTest {
             assertEquals(3, store.readAll().size)
         } finally {
             context.getSharedPreferences(prefName, Context.MODE_PRIVATE).edit().clear().commit()
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun cameraFocusShowsOnlyCamerasAndCanExpandAllFields() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val folder = File(context.cacheDir, "passport-focus-${System.nanoTime()}").apply { mkdirs() }
+        val isolated = object : ContextWrapper(context) { override fun getFilesDir(): File = folder }
+        val name = "passport-focus-prefs-${System.nanoTime()}"
+        val capability = DeviceCapabilities(listOf("1080 × 2400 · 120.0 Гц"),
+            listOf(CameraCapability("0", "задняя", listOf("4000 × 3000"), emptyList())), emptyList())
+        try {
+            compose.setContent { SpectraTheme {
+                PassportScreen(capability, DiagnosticResults(context, name), focusCameras = true,
+                    storeOverride = PassportStore(isolated), onClose = {})
+            } }
+            compose.onNodeWithText("Камеры, доступные Android").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Android · Камеры").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Android · Режимы дисплея").assertDoesNotExist()
+            compose.onNodeWithTag("passport-show-all").performScrollTo().performClick()
+            compose.onNodeWithText("Android · Режимы дисплея").performScrollTo().assertIsDisplayed()
+        } finally {
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
             folder.deleteRecursively()
         }
     }

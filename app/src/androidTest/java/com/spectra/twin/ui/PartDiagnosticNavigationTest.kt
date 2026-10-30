@@ -21,4 +21,12 @@ class PartDiagnosticNavigationTest {
         compose.onNodeWithTag("part-test-touch").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Касания экрана · результат пользователя: Есть проблема").performScrollTo().assertIsDisplayed()
     }
+
+    @Test fun cameraCardOpensCameraSectionOfPassport() {
+        compose.onNodeWithText("Выбрать деталь из списка").performScrollTo().performClick()
+        compose.onNodeWithText("Верхняя задняя камера").performClick()
+        compose.onNodeWithTag("open-camera-passport").performScrollTo().performClick()
+        compose.onNodeWithText("Камеры, доступные Android").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("passport-show-all").assertIsDisplayed()
+    }
 }

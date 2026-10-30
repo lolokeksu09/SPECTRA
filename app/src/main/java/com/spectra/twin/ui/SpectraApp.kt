@@ -67,6 +67,7 @@ fun SpectraApp(model: SpectraViewModel) {
     val context = LocalContext.current
     val diagnosticResults = remember(context) { DiagnosticResults(context) }
     var passportOpen by remember { mutableStateOf(false) }
+    var passportFocusCameras by remember { mutableStateOf(false) }
     var capabilities by remember { mutableStateOf<DeviceCapabilities?>(null) }
     val latest = model.latest
     val snackbar = remember { SnackbarHostState() }
@@ -98,7 +99,8 @@ fun SpectraApp(model: SpectraViewModel) {
         return
     }
     if (passportOpen) {
-        PassportScreen(capabilities, diagnosticResults, onCapabilitiesRefresh = { capabilities = it },
+        PassportScreen(capabilities, diagnosticResults, focusCameras = passportFocusCameras,
+            onCapabilitiesRefresh = { capabilities = it },
             onClose = { passportOpen = false })
         return
     }
@@ -153,8 +155,10 @@ fun SpectraApp(model: SpectraViewModel) {
                     model.blackModelUri, model::importBlackModelUri,
                     model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
                     capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState,
-                    onDiagnostic = { diagnosticScreen = it }, onPassport = { passportOpen = true })
-                Page.SYSTEM -> SystemScreen(latest, onPassport = { passportOpen = true })
+                    onDiagnostic = { diagnosticScreen = it }, onPassport = { focus ->
+                        passportFocusCameras = focus; passportOpen = true
+                    })
+                Page.SYSTEM -> SystemScreen(latest, onPassport = { passportFocusCameras = false; passportOpen = true })
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
                 Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
@@ -194,7 +198,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        capabilities: DeviceCapabilities?, diagnosticResults: DiagnosticResults,
                        selectedPartState: MutableState<ExternalPart?>, viewSideState: MutableState<DeviceView>,
                        focusRequestState: MutableIntState,
-                       onDiagnostic: (DiagnosticKind) -> Unit, onPassport: () -> Unit) {
+                       onDiagnostic: (DiagnosticKind) -> Unit, onPassport: (Boolean) -> Unit) {
     var viewSide by viewSideState
     var selectedPart by selectedPartState
     var showParts by remember { mutableStateOf(false) }
@@ -326,13 +330,15 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     if (part == ExternalPart.SELFIE || part == ExternalPart.MAIN_CAMERA || part == ExternalPart.ULTRAWIDE) {
                         Text(cameraSummary(part, capabilities), style = MaterialTheme.typography.bodySmall)
                         Text("Android сообщает камеры по ID; привязка ID к этому объективу не подтверждена.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = onPassport) { Text("Камеры Android в паспорте") }
+                        TextButton(onClick = { onPassport(true) }, modifier = Modifier.testTag("open-camera-passport")) {
+                            Text("Камеры Android в паспорте")
+                        }
                     }
                 }
             }
         }
         StableTwinItem {
-            OutlinedButton(onClick = onPassport, modifier = Modifier.fillMaxWidth().testTag("open-passport")) {
+            OutlinedButton(onClick = { onPassport(false) }, modifier = Modifier.fillMaxWidth().testTag("open-passport")) {
                 Text("Паспорт устройства")
             }
         }

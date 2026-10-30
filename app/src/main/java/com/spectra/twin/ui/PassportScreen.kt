@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ import java.util.Locale
 
 @Composable
 internal fun PassportScreen(capabilities: DeviceCapabilities?, results: DiagnosticResults,
+                            focusCameras: Boolean = false,
                             onCapabilitiesRefresh: (DeviceCapabilities) -> Unit = {},
                             storeOverride: PassportStore? = null, onClose: () -> Unit) {
     val context = LocalContext.current
@@ -38,7 +40,9 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
     var loading by remember { mutableStateOf(true) }
     var historyError by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
-    var currentExpanded by remember { mutableStateOf(false) }
+    var currentExpanded by remember { mutableStateOf(focusCameras) }
+    var camerasOnly by remember { mutableStateOf(focusCameras) }
+    val listState = rememberLazyListState()
     var message by remember { mutableStateOf<String?>(null) }
     val statuses = DiagnosticKind.entries.filter { it != DiagnosticKind.SENSORS }.associate {
         it.title to when (results.get(it)) { true -> "Работает"; false -> "Есть проблема"; null -> "Не проверено" }
@@ -60,9 +64,12 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
         catch (_: Exception) { historyError = true }
         finally { loading = false }
     }
+    LaunchedEffect(focusCameras, loading, historyError) {
+        if (focusCameras && !loading) listState.scrollToItem(if (historyError) 3 else 2)
+    }
     BackHandler(onBack = onClose)
     Surface(color = Night, contentColor = MaterialTheme.colorScheme.onBackground) {
-        LazyColumn(Modifier.fillMaxSize().safeDrawingPadding().testTag("passport-list"), contentPadding = PaddingValues(18.dp),
+        LazyColumn(Modifier.fillMaxSize().safeDrawingPadding().testTag("passport-list"), state = listState, contentPadding = PaddingValues(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -113,10 +120,16 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
                         Text(if (currentExpanded) "Скрыть сведения" else "Посмотреть сведения")
                     }
                     if (currentExpanded) {
+                    if (camerasOnly) {
+                        Text("Камеры, доступные Android", color = Ice, style = MaterialTheme.typography.titleMedium)
+                        TextButton(onClick = { camerasOnly = false }, modifier = Modifier.testTag("passport-show-all")) {
+                            Text("Показать все сведения")
+                        }
+                    }
                     Text("Android — сведения системы; пресет — характеристики модели; пользователь — подтверждённые результаты.",
                         color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (fields == null) Text("Получение данных Android…", color = Muted)
-                    fields?.forEach { (name, value) ->
+                    fields?.filterKeys { !camerasOnly || it == "Android · Камеры" }?.forEach { (name, value) ->
                         Spacer(Modifier.height(10.dp))
                         Text(name, color = Ice, style = MaterialTheme.typography.labelLarge)
                         Text(value, style = MaterialTheme.typography.bodyMedium)
