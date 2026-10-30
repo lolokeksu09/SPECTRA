@@ -3,6 +3,7 @@ package com.spectra.twin.ui
 import android.os.Build
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -10,6 +11,7 @@ import com.spectra.twin.render.FilamentDeviceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -68,6 +70,8 @@ fun SpectraApp(model: SpectraViewModel) {
     val diagnosticResults = remember(context) { DiagnosticResults(context) }
     var passportOpen by remember { mutableStateOf(false) }
     var passportFocus by remember { mutableStateOf(PassportFocus.ALL) }
+    val twinScroll = rememberScrollState()
+    var returnToTwin by remember { mutableStateOf(false) }
     var capabilities by remember { mutableStateOf<DeviceCapabilities?>(null) }
     val latest = model.latest
     val snackbar = remember { SnackbarHostState() }
@@ -92,6 +96,10 @@ fun SpectraApp(model: SpectraViewModel) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             capabilities = withContext(Dispatchers.IO) { DevicePassportReader.read(context) }
         }
+    }
+    BackHandler(enabled = returnToTwin && current == Page.SYSTEM && !passportOpen && diagnosticScreen == null) {
+        current = Page.TWIN
+        returnToTwin = false
     }
 
     if (diagnosticScreen != null) {
@@ -120,7 +128,7 @@ fun SpectraApp(model: SpectraViewModel) {
                     }
                     NavigationBarItem(
                         selected = current == page,
-                        onClick = { current = page },
+                        onClick = { current = page; returnToTwin = false },
                         label = { Text(page.title, maxLines = 1) },
                         icon = { Icon(icon, contentDescription = page.title) },
                         colors = NavigationBarItemDefaults.colors(
@@ -154,7 +162,8 @@ fun SpectraApp(model: SpectraViewModel) {
                     model.importedModelUri, model::importModelUri,
                     model.blackModelUri, model::importBlackModelUri,
                     model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
-                    capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState,
+                    capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState, twinScroll,
+                    onBattery = { returnToTwin = true; current = Page.SYSTEM },
                     onDiagnostic = { diagnosticScreen = it }, onPassport = { focus ->
                         passportFocus = focus; passportOpen = true
                     })
@@ -197,7 +206,8 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit,
                        capabilities: DeviceCapabilities?, diagnosticResults: DiagnosticResults,
                        selectedPartState: MutableState<ExternalPart?>, viewSideState: MutableState<DeviceView>,
-                       focusRequestState: MutableIntState,
+                       focusRequestState: MutableIntState, twinScroll: ScrollState,
+                       onBattery: () -> Unit,
                        onDiagnostic: (DiagnosticKind) -> Unit, onPassport: (PassportFocus) -> Unit) {
     var viewSide by viewSideState
     var selectedPart by selectedPartState
@@ -252,7 +262,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     // its TextureView and then try to reuse a destroyed native Filament engine.
     Column(
         modifier = Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(twinScroll)
             .padding(start = 18.dp, end = 18.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
@@ -308,6 +318,9 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                             Text("Android · температура батареи: ${if (telemetryStale) "Данные устарели" else Metrics.temperature(latest?.batteryCelsius)}")
                             Text("Android · напряжение батареи: ${if (telemetryStale) "Данные устарели" else Metrics.voltage(latest?.batteryVoltageMv)}")
                             Text("90 Вт — не измерение текущей мощности.", style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = onBattery, modifier = Modifier.testTag("open-battery-telemetry")) {
+                                Text("Показатели батареи")
+                            }
                         }
                         else -> Unit
                     }
@@ -829,4 +842,5 @@ internal fun SnapshotTrendCard(items: List<TelemetrySnapshot>) {
         }
     }
 }
+
 

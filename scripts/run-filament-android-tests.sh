@@ -42,6 +42,7 @@ PY_BLACK
     [ "$?" -eq 0 ] || exit 1
     adb pull /sdcard/Download/SPECTRA-part-ui build/model-evidence/part-ui || exit 1
     test -s build/model-evidence/part-ui/external-part-card.png || exit 1
+    test -s build/model-evidence/part-ui/usb-return.png || exit 1
     adb pull /sdcard/Download/SPECTRA-trend-ui build/model-evidence/trend-ui || exit 1
     test -s build/model-evidence/trend-ui/snapshot-trend.png || exit 1
     adb pull /sdcard/Download/SPECTRA-touch-ui build/model-evidence/touch-ui || exit 1
@@ -60,3 +61,4 @@ else
 fi
 adb exec-out screencap -p > build/model-evidence/emulator-screen.png
 exit "$spectra_test_status"
+
