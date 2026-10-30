@@ -41,7 +41,18 @@ class ExternalPartUiTest {
             }
             assertTrue("3D model view unavailable in MainActivity", found)
             SystemClock.sleep(2000)
-            val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+            // SwiftShader can miss the screenshot deadline while Filament is rendering.
+            // Pause only in the test after the dialog opens, then retry capture.
+            scenario.onActivity { activity -> findModel(activity.window.decorView)?.pause() }
+            SystemClock.sleep(500)
+            var capture: Bitmap? = null
+            repeat(3) {
+                if (capture == null) {
+                    capture = instrumentation.uiAutomation.takeScreenshot()
+                    if (capture == null) SystemClock.sleep(1000)
+                }
+            }
+            val bitmap = requireNotNull(capture) { "Emulator screenshot unavailable" }
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, "external-part-card.png")
                 put(MediaStore.Downloads.MIME_TYPE, "image/png")
