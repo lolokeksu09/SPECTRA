@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.spectra.twin.render.FilamentDeviceView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +37,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.spectra.twin.core.Metrics
 import com.spectra.twin.core.TelemetrySnapshot
 import com.spectra.twin.core.SnapshotComparison
+import com.spectra.twin.core.SnapshotTrend
 import com.spectra.twin.render.DeviceGLView
 import com.spectra.twin.render.DeviceFinish
 import com.spectra.twin.render.DeviceView
@@ -653,6 +658,7 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
                 }
             }
         } else {
+            item { SnapshotTrendCard(items) }
             item {
                 PanelCard {
                     Text("Сравнение снимков", style = MaterialTheme.typography.titleMedium)
@@ -693,6 +699,60 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
             }
         }
         item { Caption("Снимки записываются только по нажатию кнопки. Удаление данных приложения очищает историю.") }
+    }
+}
+
+@Composable
+internal fun SnapshotTrendCard(items: List<TelemetrySnapshot>) {
+    var showTemperature by remember { mutableStateOf(false) }
+    val sorted = remember(items) { items.sortedBy { it.atMillis } }
+    val series = remember(sorted, showTemperature) {
+        SnapshotTrend.build(sorted.map {
+            it.atMillis to if (showTemperature) it.batteryCelsius else it.batteryPercent?.toDouble()
+        }, if (showTemperature) -50.0..150.0 else 0.0..100.0)
+    }
+    val label = if (showTemperature) "Температура батареи" else "Заряд батареи"
+    val unit = if (showTemperature) "°C" else "%"
+    PanelCard {
+        Text("Изменения по снимкам", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text("Только сохранённые вручную снимки", color = Muted, style = MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = !showTemperature, onClick = { showTemperature = false }, label = { Text("Заряд") })
+            FilterChip(selected = showTemperature, onClick = { showTemperature = true }, label = { Text("Температура") })
+        }
+        if (series == null) {
+            Text("Нет доступных данных для графика", color = Muted)
+        } else {
+            val valueFormat = if (showTemperature) "%.1f" else "%.0f"
+            val minimum = String.format(Locale.US, valueFormat, series.minimum)
+            val maximum = String.format(Locale.US, valueFormat, series.maximum)
+            Text("$label · $minimum–$maximum $unit", color = Ice, style = MaterialTheme.typography.labelMedium)
+            val lineColor = Ice
+            val gridColor = PanelUp
+            Canvas(Modifier.fillMaxWidth().height(120.dp).padding(vertical = 10.dp)
+                .semantics { contentDescription = "$label, от $minimum до $maximum $unit. Значения и время указаны в снимках ниже." }) {
+                val inset = 4.dp.toPx()
+                val chartWidth = (size.width - 2 * inset).coerceAtLeast(0f)
+                val chartHeight = (size.height - 2 * inset).coerceAtLeast(0f)
+                fun position(x: Float, y: Float) = Offset(inset + x * chartWidth, inset + (1f - y) * chartHeight)
+                drawLine(gridColor, Offset(inset, inset), Offset(size.width - inset, inset), strokeWidth = 1.dp.toPx())
+                drawLine(gridColor, Offset(inset, size.height - inset), Offset(size.width - inset, size.height - inset), strokeWidth = 1.dp.toPx())
+                series.points.zipWithNext().forEach { (a, b) ->
+                    if (a.y != null && b.y != null) drawLine(lineColor, position(a.x, a.y), position(b.x, b.y), strokeWidth = 2.dp.toPx())
+                }
+                series.points.forEach { point ->
+                    point.y?.let { drawCircle(lineColor, radius = 3.dp.toPx(), center = position(point.x, it)) }
+                }
+            }
+            val format = SimpleDateFormat("dd.MM · HH:mm", Locale("ru"))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(format.format(Date(sorted.first().atMillis)), color = Muted, style = MaterialTheme.typography.labelSmall)
+                Text(format.format(Date(sorted.last().atMillis)), color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            Text("Пропуски означают отсутствие данных; линии между ними не проводятся.",
+                color = Muted, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
