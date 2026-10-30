@@ -31,7 +31,7 @@ class BlackModelFilamentTest {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)
                 put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-black-v2/")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-black-v3/")
             }
             requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
         }
@@ -51,10 +51,10 @@ class BlackModelFilamentTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val app = instrumentation.targetContext
         val metrics = JSONArray()
-        for (version in listOf("v1", "v2")) {
-            val source = if (version == "v1") {
-                val file = File(app.cacheDir, "black-v1-test.glb")
-                instrumentation.context.assets.open("models/black-v1.glb").use { input ->
+        for (version in listOf("v2", "v3")) {
+            val source = if (version == "v2") {
+                val file = File(app.cacheDir, "black-v2-test.glb")
+                instrumentation.context.assets.open("models/black-v2.glb").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
                 Uri.fromFile(file)
