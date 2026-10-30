@@ -1,21 +1,18 @@
-# SPECTRA 0.1 Verification
+# SPECTRA — подтверждённые проверки
 
-## Completed in current authoring environment
+## Последняя зафиксированная проверка приложения
 
-- Kotlin core source compiled with kotlinc 1.9.0 (JVM 21).
-- JVM smoke/regression checks: 25/25 passed for battery percentages, invalid and missing values, memory utilization, formatting and thermal severity.
-- Android build configuration and GitHub Actions workflow prepared.
+- Кандидат: `v0.2.0-dev.58`, исходники `ff3ab41097d2fd6050fa9cf5eadf951ccedce486`.
+- [GitHub Actions 41037437250](https://github.com/lolokeksu09/SPECTRA/actions/runs/41037437250): успешно выполнены `testDebugUnitTest` (28 тестов), `assembleDebug`, проверки и валидация GLB, тесты Filament на Android API 35 (эмулятор, SwiftShader).
+- [Debug APK](https://github.com/lolokeksu09/SPECTRA/releases/download/v0.2.0-dev.58/app-debug.apk): SHA-256 `7e6577703b0e9be7b62d7e98c33eb6e024778f743bd9218de877ea9bc0c46470`. Проверены хеши двух GLB в APK относительно результатов сборки.
+- Рендеры эмулятора просмотрены: фактура белой крышки при используемой экспозиции почти не видна; на чёрной модели вокруг камер остаются светлые точки. Это не оценка физического устройства.
 
-## Not executed (environment unavailable)
+## Непроверенные сценарии
 
-- No Android SDK / Gradle binary available locally; Android application not compiled to an APK here.
-- No emulator or Lenovo Legion Y70 connected, therefore no real sensor, OpenGL ES render, touch, system Back, font-scale, or performance test.
-- CI workflow cannot run until code is pushed into an actual GitHub repository.
+- L3 не подтверждён целиком: instrumentation запускает специальную Activity рендера, а не полный путь основного интерфейса с переключением цвета, жестами и восстановлением после перезапуска.
+- L5 не выполнен: установка именно этого APK на физический Legion Y70, телеметрия, визуальный результат, жесты, потребление ресурсов и жизненный цикл требуют проверки на устройстве.
+- Новый commit только документации не является тем же SHA; результаты выше относятся к указанному кандидату, а не автоматически к новым ревизиям.
 
-## Gates before calling 0.1 device-verified
+## Следующая проверка на устройстве
 
-1. GitHub Actions `testDebugUnitTest` and `assembleDebug` both pass.
-2. Install actual APK on the Android 16 target phone.
-3. Check battery percentage/temp/current availability, thermal status, display rate and RAM values against OS reference without assuming optional sensors exist.
-4. Test rotation, zoom, background/foreground recovery, saving two snapshots at the same telemetry timestamp, and reopening history after force stop.
-5. Check high font scale, dark theme, accessibility, and memory/performance under device load.
+Установить указанный APK, проверить оба цвета, поворот и масштабирование, возврат из фона, сохранение/перезапуск истории и данные батареи и теплового статуса. Сравнить доступные значения с Android, не считать недоступные датчики ошибкой модели. Зафиксировать версию, исход и условия; проверять производительность отдельным измерением.
