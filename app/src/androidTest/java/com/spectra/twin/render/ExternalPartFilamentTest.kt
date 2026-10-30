@@ -52,6 +52,28 @@ class ExternalPartFilamentTest {
                 val pickLimit = SystemClock.uptimeMillis() + 10000
                 while (selected.get() == null && SystemClock.uptimeMillis() < pickLimit) SystemClock.sleep(100)
                 assertEquals("$finish camera pick", ExternalPart.MAIN_CAMERA, selected.get())
+                for ((x, y, expected) in listOf(
+                    Triple(.35f, .35f, ExternalPart.ULTRAWIDE),
+                    Triple(.49f, .28f, ExternalPart.FLICKER),
+                    Triple(.49f, .35f, ExternalPart.FLASH)
+                )) {
+                    selected.set(null)
+                    down = SystemClock.uptimeMillis()
+                    touch(MotionEvent.ACTION_DOWN, x, y, down)
+                    touch(MotionEvent.ACTION_UP, x, y, down)
+                    val deadline = SystemClock.uptimeMillis() + 10000
+                    while (selected.get() == null && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+                    assertEquals("$finish pick at $x,$y", expected, selected.get())
+                }
+                selected.set(null)
+                scenario.onActivity { it.model.showSide(DeviceView.FRONT) }
+                SystemClock.sleep(1800)
+                down = SystemClock.uptimeMillis()
+                touch(MotionEvent.ACTION_DOWN, .50f, .50f, down)
+                touch(MotionEvent.ACTION_UP, .50f, .50f, down)
+                val screenDeadline = SystemClock.uptimeMillis() + 10000
+                while (selected.get() == null && SystemClock.uptimeMillis() < screenDeadline) SystemClock.sleep(100)
+                assertEquals("$finish screen pick", ExternalPart.SCREEN, selected.get())
             }
         }
     }

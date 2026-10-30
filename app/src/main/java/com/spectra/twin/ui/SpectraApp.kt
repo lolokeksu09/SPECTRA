@@ -154,18 +154,54 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     var selectedPart by remember { mutableStateOf<ExternalPart?>(null) }
+    var showParts by remember { mutableStateOf(false) }
+    if (showParts) {
+        AlertDialog(
+            onDismissRequest = { showParts = false },
+            title = { Text("Детали телефона") },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    itemsIndexed(ExternalPart.entries.toList()) { _, part ->
+                        TextButton(onClick = { showParts = false; selectedPart = part },
+                            modifier = Modifier.fillMaxWidth()) { Text(part.title) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showParts = false }) { Text("Закрыть") } }
+        )
+    }
     selectedPart?.let { part ->
         AlertDialog(
             onDismissRequest = { selectedPart = null },
             title = { Text(part.title) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(part.description)
-                    if (part == ExternalPart.SCREEN) {
-                        Text("Частота дисплея: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
-                        Text("Значение сообщает Android; это не FPS игры.", style = MaterialTheme.typography.bodySmall)
+                    when (part) {
+                        ExternalPart.SCREEN -> {
+                            Text("Характеристика модели: диагональ 6,82″.")
+                            Text("Android · частота дисплея: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
+                            Text("Частота дисплея не равна FPS игры.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        ExternalPart.SELFIE -> Text("Характеристика модели: 32 Мп.")
+                        ExternalPart.MAIN_CAMERA, ExternalPart.ULTRAWIDE -> {
+                            Text("Камеры модели: основная 50 Мп и сверхширокоугольная 8 Мп. Соответствие объективов на модели уточняется.")
+                        }
+                        ExternalPart.USB -> {
+                            Text("Характеристики модели: зарядка до 90 Вт, батарея 8000 мА·ч (типичная ёмкость).")
+                            Text(if (telemetryStale) "Android · данные батареи устарели" else
+                                "Android · заряд батареи: ${Metrics.percentLabel(latest?.batteryPercent)}")
+                            Text("Android · состояние: ${if (telemetryStale) "Данные устарели" else when (latest?.isCharging) {
+                                true -> "Заряжается или батарея полная"
+                                false -> "Не заряжается"
+                                null -> "Недоступно"
+                            }}")
+                            Text("Максимальная мощность не является измерением текущей зарядки.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        else -> Unit
                     }
-                    Text("Расположение на модели приблизительное. Описание относится к Legion Y70 нового поколения.",
+                    Text("Характеристики относятся к Legion Y70 нового поколения (XT2611-1); данные Android относятся к этому устройству.",
                         style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             },
@@ -227,6 +263,11 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
                 }
+            }
+        }
+        StableTwinItem {
+            OutlinedButton(onClick = { showParts = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Выбрать деталь из списка")
             }
         }
         StableTwinItem {
