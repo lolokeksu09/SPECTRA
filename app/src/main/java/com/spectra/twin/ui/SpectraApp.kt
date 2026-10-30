@@ -32,6 +32,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.spectra.twin.core.Metrics
 import com.spectra.twin.core.TelemetrySnapshot
+import com.spectra.twin.core.SnapshotComparison
 import com.spectra.twin.render.DeviceGLView
 import com.spectra.twin.render.DeviceFinish
 import com.spectra.twin.render.DeviceView
@@ -257,6 +258,8 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                                 false -> "Не заряжается"
                                 null -> "Недоступно"
                             }}")
+                            Text("Android · температура батареи: ${if (telemetryStale) "Данные устарели" else Metrics.temperature(latest?.batteryCelsius)}")
+                            Text("Android · напряжение батареи: ${if (telemetryStale) "Данные устарели" else Metrics.voltage(latest?.batteryVoltageMv)}")
                             Text("90 Вт — не измерение текущей мощности.", style = MaterialTheme.typography.bodySmall)
                         }
                         else -> Unit
@@ -623,6 +626,7 @@ private fun ThermalScreen(latest: TelemetrySnapshot?) {
 
 @Composable
 private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, error: Boolean, retry: () -> Unit) {
+    var selected by remember(items) { mutableStateOf(setOf<Int>()) }
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Снимки диагностики", "Локально на устройстве · до 100 последних снимков") }
@@ -649,7 +653,28 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
                 }
             }
         } else {
-            itemsIndexed(items, key = { index, snapshot -> "${snapshot.atMillis}-$index" }) { _, snapshot ->
+            item {
+                PanelCard {
+                    Text("Сравнение снимков", style = MaterialTheme.typography.titleMedium)
+                    if (selected.size < 2) {
+                        Text(if (items.size < 2) "Сохраните ещё один снимок для сравнения." else "Выберите два снимка ниже.", color = Muted)
+                    } else {
+                        val pair = selected.map { items[it] }.sortedBy { it.atMillis }
+                        val before = pair[0]
+                        val after = pair[1]
+                        val format = SimpleDateFormat("dd.MM.yyyy · HH:mm:ss", Locale("ru"))
+                        Text("До: ${format.format(Date(before.atMillis))}", color = Muted)
+                        Text("После: ${format.format(Date(after.atMillis))}", color = Muted)
+                        DataRow("Заряд", SnapshotComparison.battery(before.batteryPercent, after.batteryPercent))
+                        DataRow("Температура батареи", SnapshotComparison.temperature(before.batteryCelsius, after.batteryCelsius))
+                        DataRow("Доступная RAM", SnapshotComparison.memory(before.memoryAvailableBytes, after.memoryAvailableBytes))
+                        DataRow("Свободно в накопителе", SnapshotComparison.memory(before.storageAvailableBytes, after.storageAvailableBytes))
+                        DataRow("Тепловой статус", "${Metrics.thermalStatus(before.thermalStatus)} → ${Metrics.thermalStatus(after.thermalStatus)}")
+                        Text("Изменение рассчитано как «после» минус «до».", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            itemsIndexed(items, key = { index, snapshot -> "${snapshot.atMillis}-$index" }) { index, snapshot ->
                 PanelCard {
                     Text(SimpleDateFormat("dd.MM.yyyy · HH:mm:ss", Locale("ru"))
                         .format(Date(snapshot.atMillis)), color = Ice,
@@ -660,6 +685,10 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
                     DataRow("Тепловой статус", Metrics.thermalStatus(snapshot.thermalStatus))
                     DataRow("RAM занято", Metrics.percentLabel(Metrics.percent(
                         snapshot.memoryAvailableBytes, snapshot.memoryTotalBytes)))
+                    OutlinedButton(onClick = {
+                        selected = if (index in selected) selected - index
+                            else if (selected.size == 2) setOf(index) else selected + index
+                    }) { Text(if (index in selected) "Убрать из сравнения" else "Выбрать для сравнения") }
                 }
             }
         }
