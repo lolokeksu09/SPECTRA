@@ -34,10 +34,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import com.spectra.twin.core.Metrics
 import com.spectra.twin.core.TelemetrySnapshot
 import com.spectra.twin.core.SnapshotComparison
 import com.spectra.twin.core.SnapshotTrend
+import com.spectra.twin.core.DeviceCapabilities
+import com.spectra.twin.core.DevicePassportReader
 import com.spectra.twin.render.DeviceGLView
 import com.spectra.twin.render.DeviceFinish
 import com.spectra.twin.render.DeviceView
@@ -46,6 +49,8 @@ import androidx.compose.ui.platform.testTag
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private enum class Page(val title: String) {
     TWIN("3D-модель"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История"),
@@ -58,6 +63,8 @@ fun SpectraApp(model: SpectraViewModel) {
     var diagnosticScreen by remember { mutableStateOf<DiagnosticKind?>(null) }
     val context = LocalContext.current
     val diagnosticResults = remember(context) { DiagnosticResults(context) }
+    var passportOpen by remember { mutableStateOf(false) }
+    var capabilities by remember { mutableStateOf<DeviceCapabilities?>(null) }
     val latest = model.latest
     val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -77,9 +84,19 @@ fun SpectraApp(model: SpectraViewModel) {
     LaunchedEffect(model.message) {
         model.message?.let { snackbar.showSnackbar(it); model.clearMessage() }
     }
+    LaunchedEffect(context, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            capabilities = withContext(Dispatchers.IO) { DevicePassportReader.read(context) }
+        }
+    }
 
     if (diagnosticScreen != null) {
         DiagnosticDetail(diagnosticScreen!!, diagnosticResults, onClose = { diagnosticScreen = null })
+        return
+    }
+    if (passportOpen) {
+        PassportScreen(capabilities, diagnosticResults, onCapabilitiesRefresh = { capabilities = it },
+            onClose = { passportOpen = false })
         return
     }
 
@@ -131,8 +148,9 @@ fun SpectraApp(model: SpectraViewModel) {
                 Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
                     model.importedModelUri, model::importModelUri,
                     model.blackModelUri, model::importBlackModelUri,
-                    model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError)
-                Page.SYSTEM -> SystemScreen(latest)
+                    model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
+                    capabilities, onDiagnostic = { diagnosticScreen = it }, onPassport = { passportOpen = true })
+                Page.SYSTEM -> SystemScreen(latest, onPassport = { passportOpen = true })
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
                 Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
@@ -168,7 +186,8 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        importedModelUri: String?, onImport: (String) -> Unit,
                        blackModelUri: String?, onImportBlack: (String) -> Unit,
                        onRestoreBundled: (DeviceFinish) -> Unit,
-                       onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit) {
+                       onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit,
+                       capabilities: DeviceCapabilities?, onDiagnostic: (DiagnosticKind) -> Unit, onPassport: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     var selectedPart by remember { mutableStateOf<ExternalPart?>(null) }
     var showParts by remember { mutableStateOf(false) }
@@ -263,6 +282,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                             Text("Диагональ модели: 6,82″.")
                             Text("Android · частота: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
                             Text("Частота дисплея не равна FPS игры.", style = MaterialTheme.typography.bodySmall)
+                            Text("Android · режимы дисплея: ${capabilities?.displayModes?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "Недоступно"}", style = MaterialTheme.typography.bodySmall)
                         }
                         ExternalPart.SELFIE -> Text("Характеристика модели: 32 Мп.")
                         ExternalPart.MAIN_CAMERA, ExternalPart.ULTRAWIDE -> Text("Камеры модели: основная 50 Мп и сверхширокоугольная 8 Мп. Соответствие объективов на модели уточняется.")
@@ -282,7 +302,23 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("Характеристики: Legion Y70 нового поколения (XT2611-1). Данные Android относятся к текущему устройству.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    val tests = part.relatedDiagnostics()
+                    tests.forEach { kind ->
+                        OutlinedButton(onClick = { onDiagnostic(kind) }, modifier = Modifier.fillMaxWidth().testTag("part-test-${kind.key}")) {
+                            Text("Проверить: ${kind.title}")
+                        }
+                    }
+                    if (part == ExternalPart.SELFIE || part == ExternalPart.MAIN_CAMERA || part == ExternalPart.ULTRAWIDE) {
+                        Text(cameraSummary(part, capabilities), style = MaterialTheme.typography.bodySmall)
+                        Text("Android сообщает камеры по ID; привязка ID к этому объективу не подтверждена.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = onPassport) { Text("Камеры Android в паспорте") }
+                    }
                 }
+            }
+        }
+        StableTwinItem {
+            OutlinedButton(onClick = onPassport, modifier = Modifier.fillMaxWidth().testTag("open-passport")) {
+                Text("Паспорт устройства")
             }
         }
         StableTwinItem {
@@ -565,10 +601,11 @@ private fun Caption(text: String) {
 }
 
 @Composable
-private fun SystemScreen(latest: TelemetrySnapshot?) {
+private fun SystemScreen(latest: TelemetrySnapshot?, onPassport: () -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionTitle("Системная телеметрия", "Обновление примерно каждые 2,5 секунды во время просмотра") }
+        item { OutlinedButton(onClick = onPassport, modifier = Modifier.fillMaxWidth()) { Text("Паспорт устройства") } }
         item {
             PanelCard {
                 Text("АККУМУЛЯТОР", color = Ice, style = MaterialTheme.typography.labelLarge)

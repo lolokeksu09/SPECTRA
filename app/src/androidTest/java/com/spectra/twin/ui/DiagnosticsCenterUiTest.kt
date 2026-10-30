@@ -26,7 +26,7 @@ class DiagnosticsCenterUiTest {
         var opened: DiagnosticKind? = null
         try {
             compose.setContent { SpectraTheme { Surface(color = Night) { DiagnosticsScreen(results) { opened = it } } } }
-            compose.onAllNodesWithText("Не проверено").assertCountEquals(6)
+            compose.onAllNodesWithText("Не проверено").assertCountEquals(7)
             compose.runOnIdle { results.set(DiagnosticKind.TOUCH, true); results.set(DiagnosticKind.MIC, false) }
             compose.onNodeWithText("Работает").assertIsDisplayed()
             compose.onNodeWithText("Есть проблема").assertIsDisplayed()

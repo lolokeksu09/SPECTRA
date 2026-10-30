@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 internal enum class DiagnosticKind(val title: String, val key: String, val explanation: String) {
     TOUCH("Касания экрана", "touch", "Отметьте области, которые реагируют на касание."),
     COLORS("Цвета экрана", "colors", "Осмотрите экран на разных цветах."),
+    CAMERA("Камеры", "camera", "Откройте камеру и проверьте изображение."),
     SPEAKER("Динамик", "speaker", "Воспроизведите тестовый сигнал."),
     MIC("Микрофон", "mic", "Запишите и прослушайте короткий звук."),
     VIBRATION("Вибрация", "vibration", "Запустите короткую вибрацию."),
@@ -95,6 +96,7 @@ internal fun DiagnosticDetail(kind: DiagnosticKind, results: DiagnosticResults, 
                 DiagnosticKind.MIC -> MicrophoneTest { results.set(kind, it); onClose() }
                 DiagnosticKind.VIBRATION -> VibrationTest { results.set(kind, it); onClose() }
                 DiagnosticKind.BUTTONS -> VolumeButtonsTest { results.set(kind, it); onClose() }
+                DiagnosticKind.CAMERA -> CameraAppTest { results.set(kind, it); onClose() }
                 DiagnosticKind.SENSORS -> SensorTest(Modifier.fillMaxWidth())
                 else -> Unit
             }
