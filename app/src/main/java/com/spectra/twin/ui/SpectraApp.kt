@@ -731,9 +731,9 @@ private fun ThermalScreen(latest: TelemetrySnapshot?) {
 }
 
 @Composable
-private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, error: Boolean, retry: () -> Unit) {
+internal fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, error: Boolean, retry: () -> Unit) {
     var selected by remember(items) { mutableStateOf(setOf<Int>()) }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+    LazyColumn(modifier = Modifier.fillMaxSize().testTag("history-list"), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Снимки диагностики", "Локально на устройстве · до 100 последних снимков") }
         if (loading) {
@@ -783,16 +783,23 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
             }
             itemsIndexed(items, key = { index, snapshot -> "${snapshot.atMillis}-$index" }) { index, snapshot ->
                 PanelCard {
+                    var expanded by remember(snapshot) { mutableStateOf(false) }
                     Text(SimpleDateFormat("dd.MM.yyyy · HH:mm:ss", Locale("ru"))
                         .format(Date(snapshot.atMillis)), color = Ice,
                         style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.height(9.dp))
+                    Text("Батарея: ${Metrics.percentLabel(snapshot.batteryPercent)} · ${Metrics.temperature(snapshot.batteryCelsius)}",
+                        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+                    TextButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag("snapshot-detail-$index")) {
+                        Text(if (expanded) "Скрыть показатели" else "Показать показатели")
+                    }
+                    if (expanded) {
                     DataRow("Батарея", Metrics.percentLabel(snapshot.batteryPercent))
                     DataRow("Температура батареи", Metrics.temperature(snapshot.batteryCelsius))
                     DataRow("Тепловой статус", Metrics.thermalStatus(snapshot.thermalStatus))
                     DataRow("RAM занято", Metrics.percentLabel(Metrics.percent(
                         snapshot.memoryAvailableBytes, snapshot.memoryTotalBytes)))
-                    OutlinedButton(onClick = {
+                    }
+                    OutlinedButton(modifier = Modifier.testTag("snapshot-select-$index"), onClick = {
                         selected = if (index in selected) selected - index
                             else if (selected.size == 2) setOf(index) else selected + index
                     }) { Text(if (index in selected) "Убрать из сравнения" else "Выбрать для сравнения") }
