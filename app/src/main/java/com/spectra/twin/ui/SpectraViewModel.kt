@@ -65,19 +65,37 @@ class SpectraViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var message by mutableStateOf<String?>(null)
         private set
+    var telemetryStale by mutableStateOf(true)
+        private set
+    var historyError by mutableStateOf(false)
+        private set
+    var historyLoading by mutableStateOf(true)
+        private set
+    private var historyJob: Job? = null
     private var poller: Job? = null
     private var saving = false
 
-    init {
-        viewModelScope.launch {
+    init { reloadHistory() }
+
+    fun reloadHistory() {
+        if (historyJob?.isActive == true) return
+        historyLoading = true
+        historyJob = viewModelScope.launch {
             try {
                 history = withContext(Dispatchers.IO) { store.readAll() }
+                historyError = false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                message = "Ошибка чтения истории: ${e.javaClass.simpleName}"
+                historyError = true
+            } finally {
+                historyLoading = false
             }
         }
+    }
+
+    fun reportImportPermissionError() {
+        message = "Не удалось сохранить доступ к файлу. Выберите другую модель."
     }
 
     fun start() {
@@ -87,20 +105,22 @@ class SpectraViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val next = withContext(Dispatchers.IO) { reader.read() }
                     latest = next
+                    telemetryStale = false
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    message = "Ошибка чтения датчиков: ${e.javaClass.simpleName}"
+                    telemetryStale = true
                 }
                 delay(2500)
             }
         }
     }
 
-    fun stop() { poller?.cancel(); poller = null }
+    fun stop() { poller?.cancel(); poller = null; telemetryStale = true }
 
     fun snapshot() {
         val data = latest ?: return
+        if (telemetryStale) return
         if (saving) return
         saving = true
         viewModelScope.launch {

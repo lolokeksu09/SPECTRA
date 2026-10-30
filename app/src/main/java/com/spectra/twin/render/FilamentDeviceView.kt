@@ -220,8 +220,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                     (if (uri == null) context.assets.open(key) else
                         context.contentResolver.openInputStream(uri)
                             ?: throw IllegalArgumentException("Файл недоступен")).use {
-                        val bytes = it.readBytes()
-                        require(bytes.size <= MAX_BYTES) { "GLB превышает 16 МБ" }
+                        val bytes = BoundedInput.read(it, MAX_BYTES)
                         GlbHeader.validate(bytes)
                         bytes
                     }

@@ -99,14 +99,25 @@ fun SpectraApp(model: SpectraViewModel) {
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Header(latest?.deviceName ?: "Android", current.title)
+            if (current != Page.HISTORY) {
+                val stamp = latest?.let { SimpleDateFormat("HH:mm:ss", Locale("ru")).format(Date(it.atMillis)) }
+                val state = when {
+                    model.telemetryStale && stamp != null -> "Данные устарели · последнее обновление $stamp"
+                    model.telemetryStale -> "Ожидание данных Android"
+                    else -> "Обновлено: $stamp"
+                }
+                Text(state, color = if (model.telemetryStale) Color(0xFFFFBEBE) else Muted,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
+            }
             when (current) {
                 Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
                     model.importedModelUri, model::importModelUri,
                     model.blackModelUri, model::importBlackModelUri,
-                    model::restoreBundledModel, model::snapshot)
+                    model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError)
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
-                Page.HISTORY -> HistoryScreen(model.history)
+                Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
             }
         }
     }
@@ -139,7 +150,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        importedModelUri: String?, onImport: (String) -> Unit,
                        blackModelUri: String?, onImportBlack: (String) -> Unit,
                        onRestoreBundled: (DeviceFinish) -> Unit,
-                       onSnapshot: () -> Unit) {
+                       onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     val context = LocalContext.current
     val hasBuiltInBlack = remember(context) {
@@ -149,21 +160,23 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            runCatching {
+            val saved = runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            onImport(uri.toString())
+            }.isSuccess
+            if (saved) onImport(uri.toString()) else onImportError()
         }
     }
     val blackPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            runCatching {
+            val saved = runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
-            }
-            onImportBlack(uri.toString())
-            onFinishChange(DeviceFinish.BLACK)
+            }.isSuccess
+            if (saved) {
+                onImportBlack(uri.toString())
+                onFinishChange(DeviceFinish.BLACK)
+            } else onImportError()
         }
     }
     // Keep the GLB viewer attached while scrolling. LazyColumn may recycle
@@ -293,7 +306,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         }
         StableTwinItem {
             Caption(
-                if (hasBuiltInBlack) "Встроены офлайн: белая модель Legion Y70 v17 и чёрная v9."
+                if (hasBuiltInBlack) "Белая и чёрная модели Legion Y70 встроены для работы офлайн."
                 else if (blackModelUri == null) "Белый GLB встроен в APK. Для чёрного корпуса выберите GLB из архива один раз. Выбор сохраняется, работа офлайн."
                 else "Белый GLB встроен, чёрный GLB выбран из памяти телефона. Работа офлайн."
             )
@@ -317,7 +330,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         StableTwinItem {
             Button(
                 onClick = onSnapshot,
-                enabled = latest != null,
+                enabled = latest != null && !telemetryStale,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(15.dp)
             ) {
@@ -539,11 +552,20 @@ private fun ThermalScreen(latest: TelemetrySnapshot?) {
 }
 
 @Composable
-private fun HistoryScreen(items: List<TelemetrySnapshot>) {
+private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, error: Boolean, retry: () -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Снимки диагностики", "Локально на устройстве · до 100 последних снимков") }
-        if (items.isEmpty()) {
+        if (loading) {
+            item { Caption("Загрузка истории…") }
+        } else if (error) {
+            item {
+                PanelCard {
+                    Text("Не удалось прочитать историю. Сохранённые данные не удалены.")
+                    OutlinedButton(onClick = retry) { Text("Повторить") }
+                }
+            }
+        } else if (items.isEmpty()) {
             item {
                 PanelCard {
                     Icon(Icons.Filled.History, contentDescription = null, tint = Ice,
