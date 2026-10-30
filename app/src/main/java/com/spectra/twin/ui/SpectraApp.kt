@@ -177,21 +177,23 @@ fun SpectraApp(model: SpectraViewModel) {
 }
 
 @Composable
-private fun Header(device: String, title: String) {
+internal fun Header(device: String, title: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column {
             Text("S P E C T R A", style = MaterialTheme.typography.titleMedium,
-                color = Ice, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                color = Ice, fontWeight = FontWeight.Black, letterSpacing = 2.sp,
+                modifier = Modifier.testTag("header-brand"))
             Text(title, style = MaterialTheme.typography.labelMedium, color = Muted)
         }
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(max = 185.dp)) {
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
             Text(device, style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurface, overflow = TextOverflow.Ellipsis)
-            Text("ANDROID ${Build.VERSION.RELEASE}", color = Muted,
+                color = MaterialTheme.colorScheme.onSurface, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("header-device"))
+            Text("ANDROID ${Build.VERSION.RELEASE}", color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall)
         }
     }
