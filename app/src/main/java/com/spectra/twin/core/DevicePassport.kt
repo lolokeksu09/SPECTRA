@@ -44,7 +44,7 @@ object DevicePassportReader {
                             ?.sortedByDescending { it.width.toLong() * it.height }
                             ?.map { "${it.width} × ${it.height}" }?.distinct()
                     }.getOrNull()
-                    val features = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)?.mapNotNull {
+                    val features = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)?.toList()?.mapNotNull {
                         when (it) {
                             CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW -> "RAW"
                             CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR -> "ручной сенсор"
