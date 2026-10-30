@@ -7,6 +7,7 @@ import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.TextureView
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import com.google.android.filament.View
 import com.google.android.filament.IndirectLight
@@ -56,6 +57,13 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     private val focusZ = -4.0
     private var focusY = 0.0
     var onStatus: (String?) -> Unit = {}
+    var onPartSelected: (ExternalPart) -> Unit = {}
+    private var allowPicking = false
+    private var tapX = 0f
+    private var tapY = 0f
+    private var tapEligible = false
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+
 
     private val pinch = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -175,11 +183,14 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
                 x = event.x; y = event.y
+                tapX = event.x; tapY = event.y; tapEligible = true
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                tapEligible = false
                 x = event.getX(0); y = event.getY(0)
             }
             MotionEvent.ACTION_MOVE -> {
+                if (kotlin.math.hypot(event.x - tapX, event.y - tapY) > touchSlop) tapEligible = false
                 if (!pinch.isInProgress && event.pointerCount == 1) {
                     yaw = FullOrbit.wrap(yaw + (event.x - x) * .008f)
                     pitch = FullOrbit.wrap(pitch + (event.y - y) * .006f)
@@ -192,8 +203,24 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                     x = event.getX(remaining); y = event.getY(remaining)
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+            MotionEvent.ACTION_UP -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
+                if (tapEligible && allowPicking && !disposed && viewer.asset != null) {
+                    val request = generation
+                    val px = event.x.toInt().coerceIn(0, (surface.width - 1).coerceAtLeast(0))
+                    val py = (surface.height - 1 - event.y.toInt()).coerceIn(0, (surface.height - 1).coerceAtLeast(0))
+                    viewer.view.pick(px, py, surface.handler) { result ->
+                        if (!disposed && generation == request && allowPicking) {
+                            ExternalPart.fromNode(viewer.asset?.getName(result.renderable))?.let(onPartSelected)
+                        }
+                    }
+                }
+                tapEligible = false
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                tapEligible = false
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
         }
         return true
     }
@@ -212,6 +239,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         val key = uri?.toString() ?: ModelSources.builtinAsset(finish)
         if (disposed || sourceKey == key) return
         sourceKey = key
+        allowPicking = uri == null
         val request = ++generation
         loadJob?.cancel()
         loadJob = scope.launch {
@@ -280,3 +308,4 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         super.onDetachedFromWindow()
     }
 }
+

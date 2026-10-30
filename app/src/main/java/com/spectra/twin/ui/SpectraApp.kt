@@ -35,6 +35,7 @@ import com.spectra.twin.core.TelemetrySnapshot
 import com.spectra.twin.render.DeviceGLView
 import com.spectra.twin.render.DeviceFinish
 import com.spectra.twin.render.DeviceView
+import com.spectra.twin.render.ExternalPart
 import androidx.compose.ui.platform.testTag
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -152,6 +153,25 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        onRestoreBundled: (DeviceFinish) -> Unit,
                        onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit) {
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
+    var selectedPart by remember { mutableStateOf<ExternalPart?>(null) }
+    selectedPart?.let { part ->
+        AlertDialog(
+            onDismissRequest = { selectedPart = null },
+            title = { Text(part.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(part.description)
+                    if (part == ExternalPart.SCREEN) {
+                        Text("Частота дисплея: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
+                        Text("Значение сообщает Android; это не FPS игры.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Расположение на модели приблизительное. Описание относится к Legion Y70 нового поколения.",
+                        style = MaterialTheme.typography.bodySmall, color = Muted)
+                }
+            },
+            confirmButton = { TextButton(onClick = { selectedPart = null }) { Text("Закрыть") } }
+        )
+    }
     val context = LocalContext.current
     val hasBuiltInBlack = remember(context) {
         runCatching {
@@ -193,7 +213,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
                 val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri
-                PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, Modifier.fillMaxSize())
+                PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, { selectedPart = it }, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
@@ -203,7 +223,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp)
                 ) {
-                    Text("Вращение 360° по двум осям · масштаб двумя пальцами",
+                    Text("Нажмите на деталь · вращайте одним пальцем · масштаб двумя",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
                 }
@@ -350,7 +370,7 @@ private fun StableTwinItem(content: @Composable () -> Unit) {
 
 @Composable
 private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUri: String?,
-                         hasBuiltInBlack: Boolean, modifier: Modifier = Modifier) {
+                         hasBuiltInBlack: Boolean, onPartSelected: (ExternalPart) -> Unit, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
     var modelError by remember { mutableStateOf<String?>(null) }
     if (finish == DeviceFinish.WHITE || hasBuiltInBlack || importedModelUri != null) {
@@ -363,6 +383,7 @@ private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUr
                 } },
                 modifier = Modifier.fillMaxSize(),
                 update = { view ->
+                    view.onPartSelected = onPartSelected
                     view.setSource(importedModelUri?.let(Uri::parse), finish)
                     view.showSide(side)
                 }
@@ -596,3 +617,4 @@ private fun HistoryScreen(items: List<TelemetrySnapshot>, loading: Boolean, erro
         item { Caption("Снимки записываются только по нажатию кнопки. Удаление данных приложения очищает историю.") }
     }
 }
+
