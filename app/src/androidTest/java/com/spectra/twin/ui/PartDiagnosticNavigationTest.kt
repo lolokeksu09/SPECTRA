@@ -29,4 +29,12 @@ class PartDiagnosticNavigationTest {
         compose.onNodeWithText("Камеры, доступные Android").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("passport-show-all").assertIsDisplayed()
     }
+
+    @Test fun screenCardOpensDisplaySectionOfPassport() {
+        compose.onNodeWithText("Выбрать деталь из списка").performScrollTo().performClick()
+        compose.onNodeWithText("Экран").performClick()
+        compose.onNodeWithTag("open-display-passport").performScrollTo().performClick()
+        compose.onNodeWithText("Режимы дисплея Android").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("passport-show-all").performScrollTo().assertIsDisplayed()
+    }
 }

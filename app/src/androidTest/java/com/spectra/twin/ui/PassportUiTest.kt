@@ -77,7 +77,7 @@ class PassportUiTest {
             listOf(CameraCapability("0", "задняя", listOf("4000 × 3000"), emptyList())), emptyList())
         try {
             compose.setContent { SpectraTheme {
-                PassportScreen(capability, DiagnosticResults(context, name), focusCameras = true,
+                PassportScreen(capability, DiagnosticResults(context, name), focus = PassportFocus.CAMERAS,
                     storeOverride = PassportStore(isolated), onClose = {})
             } }
             compose.onNodeWithText("Камеры, доступные Android").performScrollTo().assertIsDisplayed()
@@ -85,6 +85,28 @@ class PassportUiTest {
             compose.onNodeWithText("Android · Режимы дисплея").assertDoesNotExist()
             compose.onNodeWithTag("passport-show-all").performScrollTo().performClick()
             compose.onNodeWithText("Android · Режимы дисплея").performScrollTo().assertIsDisplayed()
+        } finally {
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun displayFocusShowsDisplayAndCanExpandAllFields() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val folder = File(context.cacheDir, "passport-display-${System.nanoTime()}").apply { mkdirs() }
+        val isolated = object : ContextWrapper(context) { override fun getFilesDir(): File = folder }
+        val name = "passport-display-prefs-${System.nanoTime()}"
+        val capability = DeviceCapabilities(listOf("1080 × 2400 · 120.0 Гц"), emptyList(), emptyList())
+        try {
+            compose.setContent { SpectraTheme {
+                PassportScreen(capability, DiagnosticResults(context, name), focus = PassportFocus.DISPLAY,
+                    storeOverride = PassportStore(isolated), onClose = {})
+            } }
+            compose.onNodeWithText("Режимы дисплея Android").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Android · Режимы дисплея").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Android · Камеры").assertDoesNotExist()
+            compose.onNodeWithTag("passport-show-all").performScrollTo().performClick()
+            compose.onNodeWithText("Android · Камеры").performScrollTo().assertIsDisplayed()
         } finally {
             context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
             folder.deleteRecursively()

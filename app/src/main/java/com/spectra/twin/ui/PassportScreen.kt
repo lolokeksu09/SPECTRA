@@ -29,7 +29,7 @@ import java.util.Locale
 
 @Composable
 internal fun PassportScreen(capabilities: DeviceCapabilities?, results: DiagnosticResults,
-                            focusCameras: Boolean = false,
+                            focus: PassportFocus = PassportFocus.ALL,
                             onCapabilitiesRefresh: (DeviceCapabilities) -> Unit = {},
                             storeOverride: PassportStore? = null, onClose: () -> Unit) {
     val context = LocalContext.current
@@ -40,8 +40,8 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
     var loading by remember { mutableStateOf(true) }
     var historyError by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
-    var currentExpanded by remember { mutableStateOf(focusCameras) }
-    var camerasOnly by remember { mutableStateOf(focusCameras) }
+    var currentExpanded by remember { mutableStateOf(focus != PassportFocus.ALL) }
+    var currentFocus by remember { mutableStateOf(focus) }
     val listState = rememberLazyListState()
     var message by remember { mutableStateOf<String?>(null) }
     val statuses = DiagnosticKind.entries.filter { it != DiagnosticKind.SENSORS }.associate {
@@ -64,8 +64,8 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
         catch (_: Exception) { historyError = true }
         finally { loading = false }
     }
-    LaunchedEffect(focusCameras, loading, historyError) {
-        if (focusCameras && !loading) listState.scrollToItem(if (historyError) 3 else 2)
+    LaunchedEffect(focus, loading, historyError) {
+        if (focus != PassportFocus.ALL && !loading) listState.scrollToItem(if (historyError) 3 else 2)
     }
     BackHandler(onBack = onClose)
     Surface(color = Night, contentColor = MaterialTheme.colorScheme.onBackground) {
@@ -120,16 +120,16 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
                         Text(if (currentExpanded) "Скрыть сведения" else "Посмотреть сведения")
                     }
                     if (currentExpanded) {
-                    if (camerasOnly) {
-                        Text("Камеры, доступные Android", color = Ice, style = MaterialTheme.typography.titleMedium)
-                        TextButton(onClick = { camerasOnly = false }, modifier = Modifier.testTag("passport-show-all")) {
+                    if (currentFocus != PassportFocus.ALL) {
+                        Text(currentFocus.heading, color = Ice, style = MaterialTheme.typography.titleMedium)
+                        TextButton(onClick = { currentFocus = PassportFocus.ALL }, modifier = Modifier.testTag("passport-show-all")) {
                             Text("Показать все сведения")
                         }
                     }
                     Text("Android — сведения системы; пресет — характеристики модели; пользователь — подтверждённые результаты.",
                         color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (fields == null) Text("Получение данных Android…", color = Muted)
-                    fields?.filterKeys { !camerasOnly || it == "Android · Камеры" }?.forEach { (name, value) ->
+                    fields?.filterKeys { currentFocus == PassportFocus.ALL || it == currentFocus.field }?.forEach { (name, value) ->
                         Spacer(Modifier.height(10.dp))
                         Text(name, color = Ice, style = MaterialTheme.typography.labelLarge)
                         Text(value, style = MaterialTheme.typography.bodyMedium)
