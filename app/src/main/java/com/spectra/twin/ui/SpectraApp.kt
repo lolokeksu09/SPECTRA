@@ -54,9 +54,9 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private enum class Page(val title: String) {
-    TWIN("3D-модель"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История"),
-    DIAGNOSTICS("Проверки")
+private enum class Page(val title: String, val navigationTitle: String = title) {
+    TWIN("3D-модель", "3D"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История"),
+    DIAGNOSTICS("Проверки", "Тесты")
 }
 
 @Composable
@@ -129,7 +129,7 @@ fun SpectraApp(model: SpectraViewModel) {
                     NavigationBarItem(
                         selected = current == page,
                         onClick = { current = page; returnToTwin = false },
-                        label = { Text(page.title, maxLines = 1) },
+                        label = { Text(page.navigationTitle, maxLines = 1) },
                         icon = { Icon(icon, contentDescription = page.title) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Night,
