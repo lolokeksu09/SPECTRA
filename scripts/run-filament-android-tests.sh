@@ -44,6 +44,8 @@ PY_BLACK
     test -s build/model-evidence/part-ui/external-part-card.png || exit 1
     adb pull /sdcard/Download/SPECTRA-trend-ui build/model-evidence/trend-ui || exit 1
     test -s build/model-evidence/trend-ui/snapshot-trend.png || exit 1
+    adb pull /sdcard/Download/SPECTRA-touch-ui build/model-evidence/touch-ui || exit 1
+    test -s build/model-evidence/touch-ui/touch-test.png || exit 1
     adb pull /sdcard/Download/SPECTRA-selection build/model-evidence/selection || exit 1
     test -s build/model-evidence/selection/white-selected.png || exit 1
     test -s build/model-evidence/selection/black-selected.png || exit 1

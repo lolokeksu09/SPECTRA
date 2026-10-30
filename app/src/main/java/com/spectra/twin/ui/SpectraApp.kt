@@ -48,12 +48,14 @@ import java.util.Date
 import java.util.Locale
 
 private enum class Page(val title: String) {
-    TWIN("3D-модель"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История")
+    TWIN("3D-модель"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История"),
+    DIAGNOSTICS("Проверки")
 }
 
 @Composable
 fun SpectraApp(model: SpectraViewModel) {
     var current by remember { mutableStateOf(Page.TWIN) }
+    var touchTestOpen by remember { mutableStateOf(false) }
     val latest = model.latest
     val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -74,6 +76,11 @@ fun SpectraApp(model: SpectraViewModel) {
         model.message?.let { snackbar.showSnackbar(it); model.clearMessage() }
     }
 
+    if (touchTestOpen) {
+        TouchTestScreen(onClose = { touchTestOpen = false })
+        return
+    }
+
     Scaffold(
         containerColor = Night,
         snackbarHost = { SnackbarHost(snackbar) },
@@ -85,6 +92,7 @@ fun SpectraApp(model: SpectraViewModel) {
                         Page.SYSTEM -> Icons.Filled.Memory
                         Page.THERMAL -> Icons.Filled.Thermostat
                         Page.HISTORY -> Icons.Filled.History
+                        Page.DIAGNOSTICS -> Icons.Filled.TouchApp
                     }
                     NavigationBarItem(
                         selected = current == page,
@@ -106,7 +114,7 @@ fun SpectraApp(model: SpectraViewModel) {
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Header(latest?.deviceName ?: "Android", current.title)
-            if (current != Page.HISTORY) {
+            if (current != Page.HISTORY && current != Page.DIAGNOSTICS) {
                 val stamp = latest?.let { SimpleDateFormat("HH:mm:ss", Locale("ru")).format(Date(it.atMillis)) }
                 val state = when {
                     model.telemetryStale && stamp != null -> "Данные устарели · последнее обновление $stamp"
@@ -125,6 +133,7 @@ fun SpectraApp(model: SpectraViewModel) {
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
+                Page.DIAGNOSTICS -> DiagnosticsScreen(onTouchTest = { touchTestOpen = true })
             }
         }
     }
