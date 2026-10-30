@@ -36,8 +36,10 @@ class PassportUiTest {
             compose.setContent { SpectraTheme {
                 PassportScreen(DeviceCapabilities(emptyList(), emptyList(), emptyList()), results, storeOverride = store, onClose = {})
             } }
-            compose.waitUntil(10_000) { compose.onAllNodesWithText("Выбрать для сравнения").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("Загрузка сохранённых паспортов…").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("passport-list").performScrollToNode(hasText("Выбрать для сравнения"))
             compose.onAllNodesWithText("Выбрать для сравнения")[0].performScrollTo().performClick()
+            compose.onNodeWithTag("passport-list").performScrollToNode(hasText("Выбрать для сравнения"))
             compose.onAllNodesWithText("Выбрать для сравнения")[0].performScrollTo().performClick()
             compose.onNodeWithTag("passport-list").performScrollToNode(hasText("Сравнение паспортов"))
             compose.onNodeWithText("До: Старое").assertIsDisplayed()
