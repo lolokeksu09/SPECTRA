@@ -180,13 +180,13 @@ fun SpectraApp(model: SpectraViewModel) {
 @Composable
 internal fun Header(device: String, title: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column {
             Text("S P E C T R A", style = MaterialTheme.typography.titleMedium,
-                color = Ice, fontWeight = FontWeight.Black, letterSpacing = 2.sp,
+                color = Color.White, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                 modifier = Modifier.testTag("header-brand"))
             Text(title, style = MaterialTheme.typography.labelMedium, color = Muted)
         }
@@ -278,21 +278,21 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         StableTwinItem {
             Box(
                 modifier = Modifier.fillMaxWidth().height(if (selectedPart != null) 260.dp else 425.dp)
-                    .clip(RoundedCornerShape(26.dp)).background(Panel)
+                    .clip(RoundedCornerShape(24.dp)).background(Panel)
             ) {
                 val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri
                 PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, selectedPart, focusRequest,
                     { selectedPart = it }, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
-                    Text("LEGION Y70 · glTF / Filament", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp)
+                    Text("Legion Y70 · 3D-модель", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
                 Surface(
                     color = Color(0xC91C2935), shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp)
                 ) {
-                    Text("Коснитесь детали · вращайте одним пальцем · масштаб двумя",
+                    Text("Коснитесь детали · вращайте · увеличивайте двумя пальцами",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
                 }
@@ -365,13 +365,13 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
             }
         }
         StableTwinItem {
-            OutlinedButton(onClick = { onPassport(PassportFocus.ALL) }, modifier = Modifier.fillMaxWidth().testTag("open-passport")) {
-                Text("Паспорт устройства")
+            Button(onClick = { showParts = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Выбрать деталь из списка")
             }
         }
         StableTwinItem {
-            OutlinedButton(onClick = { showParts = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Text("Выбрать деталь из списка")
+            OutlinedButton(onClick = { onPassport(PassportFocus.ALL) }, modifier = Modifier.fillMaxWidth().testTag("open-passport")) {
+                Text("Паспорт устройства")
             }
         }
         StableTwinItem {

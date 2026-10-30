@@ -5,12 +5,12 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val Night = Color(0xFF05070C)
-val Panel = Color(0xFF111720)
-val PanelUp = Color(0xFF1A2530)
-val Ice = Color(0xFF77D7FF)
-val Muted = Color(0xFF98AAB9)
-val Good = Color(0xFF89E0C5)
+val Night = Color(0xFF090D12)
+val Panel = Color(0xFF151D25)
+val PanelUp = Color(0xFF25323B)
+val Ice = Color(0xFF9EDCD9)
+val Muted = Color(0xFFACBDC4)
+val Good = Color(0xFF9EDDC0)
 
 private val spectraColors = darkColorScheme(
     primary = Ice,
@@ -31,3 +31,4 @@ private val spectraColors = darkColorScheme(
 fun SpectraTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = spectraColors, content = content)
 }
+
