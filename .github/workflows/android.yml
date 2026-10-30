@@ -121,6 +121,38 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: bash scripts/run-filament-android-tests.sh
+      - name: Sign and verify the tested APK
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        shell: bash
+        env:
+          SPECTRA_KEYSTORE_B64: ${{ secrets.SPECTRA_KEYSTORE_B64 }}
+          SPECTRA_STORE_PASSWORD: ${{ secrets.SPECTRA_STORE_PASSWORD }}
+          SPECTRA_KEY_ALIAS: ${{ secrets.SPECTRA_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SPECTRA_KEYSTORE_B64" && -z "$SPECTRA_STORE_PASSWORD" && -z "$SPECTRA_KEY_ALIAS" ]]; then
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              echo "Signing secrets are not configured" >&2
+              exit 1
+            fi
+            echo "SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [[ -z "$SPECTRA_KEYSTORE_B64" || -z "$SPECTRA_STORE_PASSWORD" || -z "$SPECTRA_KEY_ALIAS" ]]; then
+            echo "Signing secrets are incomplete" >&2
+            exit 1
+          fi
+          umask 077
+          spectra_keystore="$RUNNER_TEMP/spectra-signing.p12"
+          trap 'rm -f "$spectra_keystore"' EXIT
+          printf '%s' "$SPECTRA_KEYSTORE_B64" | base64 --decode > "$spectra_keystore"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" sign --ks "$spectra_keystore" --ks-key-alias "$SPECTRA_KEY_ALIAS" \
+            --ks-pass env:SPECTRA_STORE_PASSWORD --key-pass env:SPECTRA_STORE_PASSWORD \
+            --out app/build/outputs/apk/debug/SPECTRA-signed.apk app/build/outputs/apk/debug/app-debug.apk
+          "$signer" verify --verbose --print-certs app/build/outputs/apk/debug/SPECTRA-signed.apk
+          sha256sum app/build/outputs/apk/debug/SPECTRA-signed.apk > build/model-evidence/signed-apk-sha256.txt
+          echo "SIGNING_ENABLED=true" >> "$GITHUB_ENV"
       - name: Archive model and Android verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -138,14 +170,21 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish APK to Releases for every main commit
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd build/model-evidence && zip -qr ../../SPECTRA-model-verification.zip . && cd ../..
-          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" app/build/outputs/apk/debug/app-debug.apk SPECTRA-model-verification.zip \
-            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · White v24 + Black v3 · build ${GITHUB_RUN_NUMBER}" \
-            --notes "White v24 and Black v3: fine rear micrograin in normal maps with unchanged geometry and branding. Both models validated and rendered by Android Filament on an API 35 emulator; debug APK tested at ${GITHUB_SHA}. Black v3 has 88,012 triangles vs 22,156 in black v9; physical-device performance is unmeasured. Debug-signed, not production-signed." --prerelease
+          assets=(app/build/outputs/apk/debug/app-debug.apk SPECTRA-model-verification.zip)
+          if [[ "${SIGNING_ENABLED:-false}" == "true" ]]; then
+            assets+=(app/build/outputs/apk/debug/SPECTRA-signed.apk)
+            signing_note="SPECTRA-signed.apk uses the persistent owner key; app-debug.apk uses the debug key. Both are debug builds."
+          else
+            signing_note="Debug APK only; permanent signing is not configured."
+          fi
+          gh release create "v0.2.0-dev.${GITHUB_RUN_NUMBER}" "${assets[@]}" \
+            --target "$GITHUB_SHA" --title "SPECTRA 0.2 · build ${GITHUB_RUN_NUMBER}" \
+            --notes "Android unit tests and emulator Filament checks passed at ${GITHUB_SHA}. $signing_note Physical-device verification remains outstanding." --prerelease
       - name: Publish tagged development release
         if: startsWith(github.ref, 'refs/tags/v')
         env:

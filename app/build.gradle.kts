@@ -12,7 +12,7 @@ android {
         applicationId = "com.spectra.twin"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(2) ?: 2)
         versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
