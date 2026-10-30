@@ -51,6 +51,7 @@ PY_BLACK
     test -s build/model-evidence/diagnostics-ui/diagnostics-report.png || exit 1
     adb pull /sdcard/Download/SPECTRA-passport-ui build/model-evidence/passport-ui || exit 1
     test -s build/model-evidence/passport-ui/passport-comparison.png || exit 1
+    test -s build/model-evidence/passport-ui/passport-overview.png || exit 1
     adb pull /sdcard/Download/SPECTRA-selection build/model-evidence/selection || exit 1
     test -s build/model-evidence/selection/white-selected.png || exit 1
     test -s build/model-evidence/selection/black-selected.png || exit 1

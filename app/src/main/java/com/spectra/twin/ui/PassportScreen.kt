@@ -65,7 +65,7 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
         finally { loading = false }
     }
     LaunchedEffect(focus, loading, historyError) {
-        if (focus != PassportFocus.ALL && !loading) listState.scrollToItem(if (historyError) 3 else 2)
+        if (focus != PassportFocus.ALL && !loading) listState.scrollToItem(1)
     }
     BackHandler(onBack = onClose)
     Surface(color = Night, contentColor = MaterialTheme.colorScheme.onBackground) {
@@ -78,40 +78,6 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
                 }
                 Text("Данные Android относятся к установленной прошивке. Характеристики пресета — к Legion Y70 XT2611-1.",
                     color = Muted, style = MaterialTheme.typography.bodySmall)
-            }
-            item {
-                PassportPanel {
-                    Text("Сохранить паспорт", style = MaterialTheme.typography.titleMedium)
-                    Text("Снимок содержит сведения о прошивке, режимах дисплея, камерах, датчиках и подтверждённые результаты проверок.",
-                        color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Text("Текущие заряд и температура сюда не записываются: они доступны в истории телеметрии.",
-                        color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Button(enabled = !loading && !saving && !historyError, onClick = {
-                        saving = true
-                        val capturedStatuses = statuses.toMap()
-                        scope.launch {
-                            try {
-                                val pair = withContext(Dispatchers.IO) {
-                                    val fresh = DevicePassportReader.read(context)
-                                    val snapshot = PassportSnapshot(System.currentTimeMillis(), DevicePassportReader.fields(fresh, capturedStatuses))
-                                    fresh to store.add(snapshot)
-                                }
-                                onCapabilitiesRefresh(pair.first)
-                                history = pair.second; selected = emptySet(); message = "Паспорт сохранён"
-                            } catch (e: CancellationException) { throw e }
-                            catch (_: Exception) { message = "Не удалось сохранить паспорт. Существующие данные не удалены." }
-                            finally { saving = false }
-                        }
-                    }, modifier = Modifier.testTag("save-passport")) { Text(if (saving) "Сохранение…" else "Сохранить снимок") }
-                    message?.let { Text(it, color = Muted, style = MaterialTheme.typography.bodySmall) }
-                }
-            }
-            if (loading) item { Text("Загрузка сохранённых паспортов…", color = Muted) }
-            if (historyError) item {
-                PassportPanel {
-                    Text("Не удалось прочитать сохранённые паспорта. Данные не удалены.")
-                    OutlinedButton(onClick = { reload() }) { Text("Повторить") }
-                }
             }
             item {
                 PassportPanel {
@@ -146,6 +112,40 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
                         Text("Источник характеристик камер")
                     }
                     }
+                }
+            }
+            item {
+                PassportPanel {
+                    Text("Сохранить паспорт", style = MaterialTheme.typography.titleMedium)
+                    Text("Снимок содержит сведения о прошивке, режимах дисплея, камерах, датчиках и подтверждённые результаты проверок.",
+                        color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Текущие заряд и температура сюда не записываются: они доступны в истории телеметрии.",
+                        color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Button(enabled = !loading && !saving && !historyError, onClick = {
+                        saving = true
+                        val capturedStatuses = statuses.toMap()
+                        scope.launch {
+                            try {
+                                val pair = withContext(Dispatchers.IO) {
+                                    val fresh = DevicePassportReader.read(context)
+                                    val snapshot = PassportSnapshot(System.currentTimeMillis(), DevicePassportReader.fields(fresh, capturedStatuses))
+                                    fresh to store.add(snapshot)
+                                }
+                                onCapabilitiesRefresh(pair.first)
+                                history = pair.second; selected = emptySet(); message = "Паспорт сохранён"
+                            } catch (e: CancellationException) { throw e }
+                            catch (_: Exception) { message = "Не удалось сохранить паспорт. Существующие данные не удалены." }
+                            finally { saving = false }
+                        }
+                    }, modifier = Modifier.testTag("save-passport")) { Text(if (saving) "Сохранение…" else "Сохранить снимок") }
+                    message?.let { Text(it, color = Muted, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+            if (loading) item { Text("Загрузка сохранённых паспортов…", color = Muted) }
+            if (historyError) item {
+                PassportPanel {
+                    Text("Не удалось прочитать сохранённые паспорта. Данные не удалены.")
+                    OutlinedButton(onClick = { reload() }) { Text("Повторить") }
                 }
             }
             if (!loading && !historyError) {
@@ -207,3 +207,4 @@ private fun PassportPanel(content: @Composable ColumnScope.() -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp), content = content)
     }
 }
+
