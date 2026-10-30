@@ -45,7 +45,8 @@ internal fun TouchTestScreen(onClose: () -> Unit) {
         modifier = Modifier.fillMaxSize().background(Night).safeDrawingPadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Проверка касаний", style = MaterialTheme.typography.titleLarge)
+        Text("Проверка касаний", color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.titleLarge)
         Text("Коснитесь каждой области отдельно.", color = Muted, style = MaterialTheme.typography.bodySmall)
         Text("Отмечено: ${marked.size} / 24", color = Ice,
             style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("touch-progress"))
