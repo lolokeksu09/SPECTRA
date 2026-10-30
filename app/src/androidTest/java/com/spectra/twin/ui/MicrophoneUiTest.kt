@@ -2,6 +2,7 @@ package com.spectra.twin.ui
 
 import android.Manifest
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -23,14 +24,14 @@ class MicrophoneUiTest {
         val show = mutableStateOf(true)
         try {
             compose.setContent {
-                SpectraTheme { Surface(color = Night) { if (show.value) MicrophoneTest {} } }
+                SpectraTheme { Surface(color = Night) { Column { if (show.value) MicrophoneTest {} } } }
             }
             compose.onNodeWithText("Записать 5 секунд").performClick()
             try {
                 compose.waitUntil(20_000) {
                     compose.onAllNodesWithText("Запись готова. Прослушайте её.").fetchSemanticsNodes().isNotEmpty()
                 }
-            } catch (e: AssertionError) {
+            } catch (e: Throwable) {
                 throw AssertionError(compose.onRoot().printToString(), e)
             }
             compose.onNodeWithText("Прослушать запись").performClick()
