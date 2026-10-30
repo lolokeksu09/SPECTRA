@@ -48,6 +48,7 @@ PY_BLACK
 else
     adb pull /sdcard/Download/SPECTRA-v24 build/model-evidence/filament || true
     adb pull /sdcard/Download/SPECTRA-black-v3 build/model-evidence/filament-black || true
+    adb pull /sdcard/Download/SPECTRA-selection build/model-evidence/selection || true
 fi
 adb exec-out screencap -p > build/model-evidence/emulator-screen.png
 exit "$spectra_test_status"

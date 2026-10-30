@@ -33,7 +33,23 @@ class SelectionFilamentTest {
                     scenario.onActivity { bitmap = (it.model.getChildAt(0) as TextureView).bitmap }
                     return requireNotNull(bitmap)
                 }
-                val before = frame()
+                // CPU asset completion precedes the first GPU frame. Do not compare a blank surface.
+                var before = frame()
+                val frameLimit = SystemClock.uptimeMillis() + 30000
+                fun visible(b: Bitmap): Int {
+                    var n = 0
+                    for (y in 0 until b.height step 4) for (x in 0 until b.width step 4) {
+                        val p = b.getPixel(x, y)
+                        if (((p shr 16) and 255) > 20 || ((p shr 8) and 255) > 20 || (p and 255) > 20) n++
+                    }
+                    return n
+                }
+                while (visible(before) < 500 && SystemClock.uptimeMillis() < frameLimit) {
+                    before.recycle(); SystemClock.sleep(300); before = frame()
+                }
+                assertTrue("$finish baseline frame is blank", visible(before) >= 500)
+                SystemClock.sleep(1000)
+                before.recycle(); before = frame()
                 scenario.onActivity { it.model.selectPart(ExternalPart.MAIN_CAMERA) }
                 SystemClock.sleep(1800)
                 val selected = frame()
@@ -50,19 +66,21 @@ class SelectionFilamentTest {
                     }
                     return count
                 }
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                val resolver = instrumentation.targetContext.contentResolver
+                for ((label, bitmap) in listOf("before" to before, "selected" to selected, "restored" to restored)) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, "${finish.id}-$label.png")
+                        put(MediaStore.Downloads.MIME_TYPE, "image/png")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-selection/")
+                    }
+                    val uri = requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
+                    requireNotNull(resolver.openOutputStream(uri)).use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                }
                 val changed = difference(before, selected)
                 val remaining = difference(before, restored)
                 assertTrue("$finish highlight not visible: $changed", changed > 30)
                 assertTrue("$finish material not restored: $remaining / $changed", remaining < changed / 3)
-                val instrumentation = InstrumentationRegistry.getInstrumentation()
-                val resolver = instrumentation.targetContext.contentResolver
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, "${finish.id}-selected.png")
-                    put(MediaStore.Downloads.MIME_TYPE, "image/png")
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-selection/")
-                }
-                val uri = requireNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
-                requireNotNull(resolver.openOutputStream(uri)).use { assertTrue(selected.compress(Bitmap.CompressFormat.PNG, 100, it)) }
                 before.recycle(); selected.recycle(); restored.recycle()
                 scenario.onActivity { activity ->
                     val model = activity.model
