@@ -52,6 +52,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class Page(val title: String, val navigationTitle: String = title) {
@@ -215,6 +216,12 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     var selectedPart by selectedPartState
     var showParts by remember { mutableStateOf(false) }
     var focusRequest by focusRequestState
+    val scope = rememberCoroutineScope()
+    fun closePart() {
+        selectedPart = null
+        scope.launch { twinScroll.scrollTo(0) }
+    }
+    BackHandler(enabled = selectedPart != null && !showParts) { closePart() }
     if (showParts) {
         AlertDialog(
             onDismissRequest = { showParts = false },
@@ -296,7 +303,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                 PanelCard {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(part.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { selectedPart = null }) { Text("Закрыть") }
+                        TextButton(onClick = { closePart() }) { Text("Закрыть") }
                     }
                     Text(part.description, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))

@@ -63,5 +63,14 @@ class PartDiagnosticNavigationTest {
         }
         bitmap.recycle()
     }
+
+    @Test fun backClosesSelectedPartAndReturnsToModel() {
+        compose.onNodeWithText("Выбрать деталь из списка").performScrollTo().performClick()
+        compose.onNodeWithText("USB-C").performClick()
+        compose.onNodeWithTag("open-battery-telemetry").performScrollTo().assertIsDisplayed()
+        compose.activity.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("open-battery-telemetry").assertDoesNotExist()
+        compose.onNodeWithText("DIGITAL TWIN").assertIsDisplayed()
+    }
 }
 
