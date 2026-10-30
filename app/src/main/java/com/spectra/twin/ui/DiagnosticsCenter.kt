@@ -53,8 +53,15 @@ internal fun DiagnosticsScreen(results: DiagnosticResults, onOpen: (DiagnosticKi
         item {
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Отчёт", style = MaterialTheme.typography.titleMedium)
-                    Text("Результаты подтверждены пользователем и хранятся на устройстве.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    var reportExpanded by remember { mutableStateOf(false) }
+                    val checks = DiagnosticKind.entries.filter { it != DiagnosticKind.SENSORS }
+                    val checked = checks.count { results.get(it) != null }
+                    Text("Проверено: $checked из ${checks.size}", style = MaterialTheme.typography.titleMedium)
+                    Text("Результаты отмечаете вы; они хранятся на устройстве.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { reportExpanded = !reportExpanded }, modifier = Modifier.testTag("diagnostics-report-toggle")) {
+                        Text(if (reportExpanded) "Скрыть отчёт" else "Показать отчёт")
+                    }
+                    if (reportExpanded) {
                     DiagnosticKind.entries.filter { it != DiagnosticKind.SENSORS }.forEach { kind ->
                         val status = when (results.get(kind)) { true -> "Работает"; false -> "Есть проблема"; null -> "Не проверено" }
                         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -62,6 +69,7 @@ internal fun DiagnosticsScreen(results: DiagnosticResults, onOpen: (DiagnosticKi
                             Text(status, color = if (results.get(kind) == false) MaterialTheme.colorScheme.error else Ice,
                                 style = MaterialTheme.typography.labelMedium)
                         }
+                    }
                     }
                 }
             }
@@ -73,6 +81,12 @@ internal fun DiagnosticsScreen(results: DiagnosticResults, onOpen: (DiagnosticKi
                     Text(kind.title, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
                     Text(kind.explanation, color = Muted, style = MaterialTheme.typography.bodySmall)
+                    if (kind != DiagnosticKind.SENSORS) {
+                        val status = when (results.get(kind)) { true -> "Работает"; false -> "Есть проблема"; null -> "Не проверено" }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Ваш результат: $status", color = if (results.get(kind) == false) MaterialTheme.colorScheme.error else Ice,
+                            style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
@@ -114,3 +128,4 @@ internal fun ManualResultButtons(enabled: Boolean = true, onResult: (Boolean) ->
         Button(onClick = { onResult(true) }, enabled = enabled, modifier = Modifier.weight(1f)) { Text("Работает") }
     }
 }
+
