@@ -162,9 +162,20 @@ internal fun PassportScreen(capabilities: DeviceCapabilities?, results: Diagnost
                 }
                 itemsIndexed(history, key = { index, snapshot -> "${snapshot.atMillis}-$index" }) { index, snapshot ->
                     PassportPanel {
+                        var expanded by remember(snapshot) { mutableStateOf(false) }
                         val format = SimpleDateFormat("dd.MM.yyyy · HH:mm:ss", Locale("ru"))
                         Text(format.format(Date(snapshot.atMillis)), color = Ice)
                         Text(snapshot.fields["Android · Сборка"] ?: "Сборка не записана", color = Muted)
+                        TextButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag("passport-detail-$index")) {
+                            Text(if (expanded) "Скрыть снимок" else "Посмотреть снимок")
+                        }
+                        if (expanded) {
+                            Text("Сведения на момент сохранения", color = Muted, style = MaterialTheme.typography.bodySmall)
+                            snapshot.fields.forEach { (name, value) ->
+                                Text(name, color = Ice, style = MaterialTheme.typography.labelLarge)
+                                Text(value, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                         OutlinedButton(onClick = {
                             selected = if (index in selected) selected - index
                             else if (selected.size == 2) setOf(index) else selected + index

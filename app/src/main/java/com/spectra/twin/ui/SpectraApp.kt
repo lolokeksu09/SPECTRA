@@ -61,6 +61,9 @@ private enum class Page(val title: String) {
 fun SpectraApp(model: SpectraViewModel) {
     var current by remember { mutableStateOf(Page.TWIN) }
     var diagnosticScreen by remember { mutableStateOf<DiagnosticKind?>(null) }
+    val selectedPartState = remember { mutableStateOf<ExternalPart?>(null) }
+    val viewSideState = remember { mutableStateOf(DeviceView.REAR) }
+    val focusRequestState = remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val diagnosticResults = remember(context) { DiagnosticResults(context) }
     var passportOpen by remember { mutableStateOf(false) }
@@ -149,7 +152,8 @@ fun SpectraApp(model: SpectraViewModel) {
                     model.importedModelUri, model::importModelUri,
                     model.blackModelUri, model::importBlackModelUri,
                     model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
-                    capabilities, onDiagnostic = { diagnosticScreen = it }, onPassport = { passportOpen = true })
+                    capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState,
+                    onDiagnostic = { diagnosticScreen = it }, onPassport = { passportOpen = true })
                 Page.SYSTEM -> SystemScreen(latest, onPassport = { passportOpen = true })
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
@@ -187,11 +191,14 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                        blackModelUri: String?, onImportBlack: (String) -> Unit,
                        onRestoreBundled: (DeviceFinish) -> Unit,
                        onSnapshot: () -> Unit, telemetryStale: Boolean, onImportError: () -> Unit,
-                       capabilities: DeviceCapabilities?, onDiagnostic: (DiagnosticKind) -> Unit, onPassport: () -> Unit) {
-    var viewSide by remember { mutableStateOf(DeviceView.REAR) }
-    var selectedPart by remember { mutableStateOf<ExternalPart?>(null) }
+                       capabilities: DeviceCapabilities?, diagnosticResults: DiagnosticResults,
+                       selectedPartState: MutableState<ExternalPart?>, viewSideState: MutableState<DeviceView>,
+                       focusRequestState: MutableIntState,
+                       onDiagnostic: (DiagnosticKind) -> Unit, onPassport: () -> Unit) {
+    var viewSide by viewSideState
+    var selectedPart by selectedPartState
     var showParts by remember { mutableStateOf(false) }
-    var focusRequest by remember { mutableIntStateOf(0) }
+    var focusRequest by focusRequestState
     if (showParts) {
         AlertDialog(
             onDismissRequest = { showParts = false },
@@ -304,6 +311,14 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     Text("Характеристики: Legion Y70 нового поколения (XT2611-1). Данные Android относятся к текущему устройству.", style = MaterialTheme.typography.bodySmall, color = Muted)
                     val tests = part.relatedDiagnostics()
                     tests.forEach { kind ->
+                        val status = when (diagnosticResults.get(kind)) {
+                            true -> "Работает"
+                            false -> "Есть проблема"
+                            null -> "Не проверено"
+                        }
+                        Text("${kind.title} · результат пользователя: $status",
+                            color = if (diagnosticResults.get(kind) == false) MaterialTheme.colorScheme.error else Muted,
+                            style = MaterialTheme.typography.bodySmall)
                         OutlinedButton(onClick = { onDiagnostic(kind) }, modifier = Modifier.fillMaxWidth().testTag("part-test-${kind.key}")) {
                             Text("Проверить: ${kind.title}")
                         }

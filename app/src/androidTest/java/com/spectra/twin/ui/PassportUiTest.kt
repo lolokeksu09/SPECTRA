@@ -37,6 +37,10 @@ class PassportUiTest {
                 PassportScreen(DeviceCapabilities(emptyList(), emptyList(), emptyList()), results, storeOverride = store, onClose = {})
             } }
             compose.waitUntil(10_000) { compose.onAllNodesWithText("Загрузка сохранённых паспортов…").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("passport-list").performScrollToNode(hasTestTag("passport-detail-0"))
+            compose.onNodeWithTag("passport-detail-0").performClick()
+            compose.onNodeWithText("Новое").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("passport-detail-0").performScrollTo().performClick()
             compose.onNodeWithTag("passport-list").performScrollToNode(hasText("Выбрать для сравнения"))
             compose.onAllNodesWithText("Выбрать для сравнения")[0].performScrollTo().performClick()
             compose.onNodeWithTag("passport-list").performScrollToNode(hasText("Выбрать для сравнения"))
