@@ -18,6 +18,12 @@ enum class ExternalPart(val title: String, val description: String) {
     BACK("Задняя крышка", "Внешняя поверхность корпуса."),
     FRAME("Рамка", "Боковая часть корпуса телефона.");
 
+    fun preferredSide(): DeviceView = when (this) {
+        SCREEN, SELFIE -> DeviceView.FRONT
+        USB, SIM, SPEAKER, MICROPHONE -> DeviceView.BOTTOM
+        else -> DeviceView.REAR
+    }
+
     companion object {
         fun fromNode(name: String?): ExternalPart? {
             val n = name?.lowercase() ?: return null

@@ -42,6 +42,9 @@ PY_BLACK
     [ "$?" -eq 0 ] || exit 1
     adb pull /sdcard/Download/SPECTRA-part-ui build/model-evidence/part-ui || exit 1
     test -s build/model-evidence/part-ui/external-part-card.png || exit 1
+    adb pull /sdcard/Download/SPECTRA-selection build/model-evidence/selection || exit 1
+    test -s build/model-evidence/selection/white-selected.png || exit 1
+    test -s build/model-evidence/selection/black-selected.png || exit 1
 else
     adb pull /sdcard/Download/SPECTRA-v24 build/model-evidence/filament || true
     adb pull /sdcard/Download/SPECTRA-black-v3 build/model-evidence/filament-black || true

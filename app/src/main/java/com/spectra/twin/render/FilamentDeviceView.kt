@@ -11,6 +11,7 @@ import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import com.google.android.filament.View
 import com.google.android.filament.IndirectLight
+import com.google.android.filament.MaterialInstance
 import com.google.android.filament.utils.ModelViewer
 import com.google.android.filament.utils.Utils
 import kotlinx.coroutines.*
@@ -59,6 +60,10 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
     var onStatus: (String?) -> Unit = {}
     var onPartSelected: (ExternalPart) -> Unit = {}
     private var allowPicking = false
+    private data class Highlighted(val entity: Int, val primitive: Int,
+                                   val original: MaterialInstance, val highlight: MaterialInstance)
+    private val highlights = mutableListOf<Highlighted>()
+    private var selectedPart: ExternalPart? = null
     private var tapX = 0f
     private var tapY = 0f
     private var tapEligible = false
@@ -124,6 +129,7 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                 loadJob?.cancel()
                 scope.cancel()
                 if (!nativeReleased) {
+                    clearHighlights()
                     nativeReleased = true
                     // This listener precedes ModelViewer's own engine teardown.
                     // Detach scene references before destroying native resources.
@@ -235,9 +241,66 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
         lastTouchNs = System.nanoTime()
     }
 
+    /** A selected part has private duplicated materials; never mutate shared glTF materials. */
+    private fun clearHighlights() {
+        if (highlights.isEmpty()) return
+        val rm = viewer.engine.renderableManager
+        for (entry in highlights) {
+            val instance = rm.getInstance(entry.entity)
+            if (instance != 0) rm.setMaterialInstanceAt(instance, entry.primitive, entry.original)
+            viewer.engine.destroyMaterialInstance(entry.highlight)
+        }
+        highlights.clear()
+    }
+
+    fun selectPart(part: ExternalPart?) {
+        if (disposed || selectedPart == part && highlights.isNotEmpty()) return
+        clearHighlights()
+        selectedPart = part
+        val asset = viewer.asset ?: return
+        if (!allowPicking || part == null) return
+        val rm = viewer.engine.renderableManager
+        for (entity in asset.renderableEntities) {
+            if (ExternalPart.fromNode(asset.getName(entity)) != part) continue
+            val instance = rm.getInstance(entity)
+            if (instance == 0) continue
+            for (primitive in 0 until rm.getPrimitiveCount(instance)) {
+                val original = rm.getMaterialInstanceAt(instance, primitive)
+                if (!original.material.hasParameter("baseColorFactor")) continue
+                val copy = MaterialInstance.duplicate(original, "spectra-selection")
+                copy.setParameter("baseColorFactor", .12f, .85f, 1f, 1f)
+                if (copy.material.hasParameter("emissiveFactor")) {
+                    copy.setParameter("emissiveFactor", .02f, .22f, .30f)
+                }
+                if (copy.material.hasParameter("emissiveStrength")) copy.setParameter("emissiveStrength", 1f)
+                rm.setMaterialInstanceAt(instance, primitive, copy)
+                highlights.add(Highlighted(entity, primitive, original, copy))
+            }
+        }
+    }
+
+    /** Focus bookmarks only for explicit list selection; touch selection keeps the user's angle. */
+    fun focusOnPart(part: ExternalPart) {
+        if (disposed || !allowPicking) return
+        lastSide = null
+        when (part) {
+            ExternalPart.SCREEN, ExternalPart.SELFIE -> { showSide(DeviceView.FRONT); if (part == ExternalPart.SELFIE) { focusY = .78; radius = 2f } }
+            ExternalPart.USB, ExternalPart.SIM, ExternalPart.SPEAKER, ExternalPart.MICROPHONE -> showSide(DeviceView.BOTTOM)
+            ExternalPart.POWER, ExternalPart.VOLUME -> { yaw = (-PI / 2).toFloat(); pitch = 0f; focusY = .55; radius = 2.1f; lastSide = null }
+            ExternalPart.SMART -> { yaw = (PI / 2).toFloat(); pitch = 0f; focusY = .6; radius = 2.1f; lastSide = null }
+            ExternalPart.MAIN_CAMERA, ExternalPart.ULTRAWIDE, ExternalPart.FLASH, ExternalPart.FLICKER -> {
+                showSide(DeviceView.REAR); yaw = 0f; pitch = -.08f; focusY = .67; radius = 2.15f
+            }
+            else -> showSide(DeviceView.REAR)
+        }
+        lastSide = part.preferredSide()
+        lastTouchNs = System.nanoTime()
+    }
+
     fun setSource(uri: Uri?, finish: DeviceFinish) {
         val key = uri?.toString() ?: ModelSources.builtinAsset(finish)
         if (disposed || sourceKey == key) return
+        clearHighlights()
         sourceKey = key
         allowPicking = uri == null
         val request = ++generation
@@ -254,9 +317,11 @@ class FilamentDeviceView(context: Context) : FrameLayout(context) {
                     }
                 }
                 if (disposed || generation != request) return@launch
+                clearHighlights()
                 viewer.loadModelGlb(ByteBuffer.wrap(bytes))
                 check(viewer.asset != null) { "GLB не загружен" }
                 viewer.transformToUnitCube()
+                selectPart(selectedPart)
                 onStatus(null)
             } catch (e: CancellationException) {
                 throw e

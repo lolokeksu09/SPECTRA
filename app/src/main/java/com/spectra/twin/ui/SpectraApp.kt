@@ -155,6 +155,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     var viewSide by remember { mutableStateOf(DeviceView.REAR) }
     var selectedPart by remember { mutableStateOf<ExternalPart?>(null) }
     var showParts by remember { mutableStateOf(false) }
+    var focusRequest by remember { mutableIntStateOf(0) }
     if (showParts) {
         AlertDialog(
             onDismissRequest = { showParts = false },
@@ -162,50 +163,15 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
             text = {
                 LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                     itemsIndexed(ExternalPart.entries.toList()) { _, part ->
-                        TextButton(onClick = { showParts = false; selectedPart = part },
+                        TextButton(onClick = {
+                            showParts = false; selectedPart = part
+                            viewSide = part.preferredSide(); focusRequest++
+                        },
                             modifier = Modifier.fillMaxWidth()) { Text(part.title) }
                     }
                 }
             },
             confirmButton = { TextButton(onClick = { showParts = false }) { Text("Закрыть") } }
-        )
-    }
-    selectedPart?.let { part ->
-        AlertDialog(
-            onDismissRequest = { selectedPart = null },
-            title = { Text(part.title) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(part.description)
-                    when (part) {
-                        ExternalPart.SCREEN -> {
-                            Text("Характеристика модели: диагональ 6,82″.")
-                            Text("Android · частота дисплея: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
-                            Text("Частота дисплея не равна FPS игры.", style = MaterialTheme.typography.bodySmall)
-                        }
-                        ExternalPart.SELFIE -> Text("Характеристика модели: 32 Мп.")
-                        ExternalPart.MAIN_CAMERA, ExternalPart.ULTRAWIDE -> {
-                            Text("Камеры модели: основная 50 Мп и сверхширокоугольная 8 Мп. Соответствие объективов на модели уточняется.")
-                        }
-                        ExternalPart.USB -> {
-                            Text("Характеристики модели: зарядка до 90 Вт, батарея 8000 мА·ч (типичная ёмкость).")
-                            Text(if (telemetryStale) "Android · данные батареи устарели" else
-                                "Android · заряд батареи: ${Metrics.percentLabel(latest?.batteryPercent)}")
-                            Text("Android · состояние: ${if (telemetryStale) "Данные устарели" else when (latest?.isCharging) {
-                                true -> "Заряжается или батарея полная"
-                                false -> "Не заряжается"
-                                null -> "Недоступно"
-                            }}")
-                            Text("Максимальная мощность не является измерением текущей зарядки.", style = MaterialTheme.typography.bodySmall)
-                        }
-                        else -> Unit
-                    }
-                    Text("Характеристики относятся к Legion Y70 нового поколения (XT2611-1); данные Android относятся к этому устройству.",
-                        style = MaterialTheme.typography.bodySmall, color = Muted)
-                }
-            },
-            confirmButton = { TextButton(onClick = { selectedPart = null }) { Text("Закрыть") } }
         )
     }
     val context = LocalContext.current
@@ -249,7 +215,8 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
                 val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri
-                PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, { selectedPart = it }, Modifier.fillMaxSize())
+                PhonePreview(finish, viewSide, activeUri, hasBuiltInBlack, selectedPart, focusRequest,
+                    { selectedPart = it }, Modifier.fillMaxSize())
                 Column(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                     Text("DIGITAL TWIN", color = Ice, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
@@ -262,6 +229,40 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
                     Text("Коснитесь детали · вращайте одним пальцем · масштаб двумя",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         color = Color(0xFFDCE8F0), style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        selectedPart?.let { part ->
+            StableTwinItem {
+                PanelCard {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(part.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { selectedPart = null }) { Text("Закрыть") }
+                    }
+                    Text(part.description, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    when (part) {
+                        ExternalPart.SCREEN -> {
+                            Text("Диагональ модели: 6,82″.")
+                            Text("Android · частота: ${if (telemetryStale) "Данные устарели" else Metrics.hz(latest?.refreshRateHz)}")
+                            Text("Частота дисплея не равна FPS игры.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        ExternalPart.SELFIE -> Text("Характеристика модели: 32 Мп.")
+                        ExternalPart.MAIN_CAMERA, ExternalPart.ULTRAWIDE -> Text("Камеры модели: основная 50 Мп и сверхширокоугольная 8 Мп. Соответствие объективов на модели уточняется.")
+                        ExternalPart.USB -> {
+                            Text("Модель: зарядка до 90 Вт, батарея 8000 мА·ч (типичная ёмкость).")
+                            Text(if (telemetryStale) "Android · данные батареи устарели" else "Android · заряд: ${Metrics.percentLabel(latest?.batteryPercent)}")
+                            Text("Android · состояние: ${if (telemetryStale) "Данные устарели" else when (latest?.isCharging) {
+                                true -> "Заряжается или батарея полная"
+                                false -> "Не заряжается"
+                                null -> "Недоступно"
+                            }}")
+                            Text("90 Вт — не измерение текущей мощности.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        else -> Unit
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Характеристики: Legion Y70 нового поколения (XT2611-1). Данные Android относятся к текущему устройству.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             }
         }
@@ -411,11 +412,13 @@ private fun StableTwinItem(content: @Composable () -> Unit) {
 
 @Composable
 private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUri: String?,
-                         hasBuiltInBlack: Boolean, onPartSelected: (ExternalPart) -> Unit, modifier: Modifier = Modifier) {
+                         hasBuiltInBlack: Boolean, selectedPart: ExternalPart?, focusRequest: Int,
+                         onPartSelected: (ExternalPart) -> Unit, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current
     var modelError by remember { mutableStateOf<String?>(null) }
     if (finish == DeviceFinish.WHITE || hasBuiltInBlack || importedModelUri != null) {
         val preview = remember { mutableStateOf<FilamentDeviceView?>(null) }
+        var lastFocusRequest by remember { mutableIntStateOf(0) }
         Box(modifier) {
             AndroidView(
                 factory = { ctx -> FilamentDeviceView(ctx).also { view ->
@@ -427,6 +430,11 @@ private fun PhonePreview(finish: DeviceFinish, side: DeviceView, importedModelUr
                     view.onPartSelected = onPartSelected
                     view.setSource(importedModelUri?.let(Uri::parse), finish)
                     view.showSide(side)
+                    view.selectPart(selectedPart)
+                    if (lastFocusRequest != focusRequest && selectedPart != null) {
+                        view.focusOnPart(selectedPart)
+                        lastFocusRequest = focusRequest
+                    }
                 }
             )
             modelError?.let { message ->
