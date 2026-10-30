@@ -211,7 +211,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     ) {
         StableTwinItem {
             Box(
-                modifier = Modifier.fillMaxWidth().height(425.dp)
+                modifier = Modifier.fillMaxWidth().height(if (selectedPart != null) 260.dp else 425.dp)
                     .clip(RoundedCornerShape(26.dp)).background(Panel)
             ) {
                 val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri

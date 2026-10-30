@@ -33,8 +33,20 @@ class ExternalPartUiTest {
             while (!found && SystemClock.uptimeMillis() < limit) {
                 scenario.onActivity { activity ->
                     findModel(activity.window.decorView)?.let { view ->
-                        found = true
-                        view.onPartSelected(ExternalPart.MAIN_CAMERA)
+                        val texture = view.getChildAt(0) as? android.view.TextureView
+                        val bitmap = texture?.bitmap
+                        var visible = 0
+                        if (bitmap != null) {
+                            for (y in 0 until bitmap.height step 6) for (x in 0 until bitmap.width step 6) {
+                                val pixel = bitmap.getPixel(x, y)
+                                if (((pixel shr 16) and 255) > 35 || ((pixel shr 8) and 255) > 35 || (pixel and 255) > 35) visible++
+                            }
+                            bitmap.recycle()
+                        }
+                        if (visible > 150) {
+                            found = true
+                            view.onPartSelected(ExternalPart.MAIN_CAMERA)
+                        }
                     }
                 }
                 if (!found) SystemClock.sleep(200)
