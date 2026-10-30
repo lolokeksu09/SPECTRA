@@ -17,28 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun DiagnosticsScreen(onTouchTest: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("Ручные проверки", style = MaterialTheme.typography.headlineSmall)
-        Text("Проверяйте работу компонентов самостоятельно.", color = Muted)
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Касания экрана", style = MaterialTheme.typography.titleMedium)
-                Text("Коснитесь каждой области сетки и проверьте, все ли они реагируют.",
-                    style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = onTouchTest, modifier = Modifier.testTag("start-touch-test")) { Text("Начать проверку") }
-            }
-        }
-        Text("Результат остаётся на экране только во время проверки и не сохраняется в историю.",
-            color = Muted, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-internal fun TouchTestScreen(onClose: () -> Unit) {
+internal fun TouchTestScreen(onResult: (Boolean) -> Unit = {}, onClose: () -> Unit) {
     val marked = remember { mutableStateListOf<Int>() }
     BackHandler(onBack = onClose)
     Column(
@@ -78,6 +57,10 @@ internal fun TouchTestScreen(onClose: () -> Unit) {
             else "Неотмеченная область могла не получить касание. Края за пределами сетки не проверяются.",
             color = Muted, style = MaterialTheme.typography.bodySmall
         )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onResult(false); onClose() }, modifier = Modifier.weight(1f)) { Text("Проблема") }
+            Button(onClick = { onResult(true); onClose() }, enabled = marked.size == 24, modifier = Modifier.weight(1f)) { Text("Работает") }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { marked.clear() }, modifier = Modifier.weight(1f).testTag("touch-reset")) {
                 Text("Сбросить")

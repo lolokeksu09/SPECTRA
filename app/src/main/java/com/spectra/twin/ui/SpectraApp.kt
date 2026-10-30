@@ -55,7 +55,9 @@ private enum class Page(val title: String) {
 @Composable
 fun SpectraApp(model: SpectraViewModel) {
     var current by remember { mutableStateOf(Page.TWIN) }
-    var touchTestOpen by remember { mutableStateOf(false) }
+    var diagnosticScreen by remember { mutableStateOf<DiagnosticKind?>(null) }
+    val context = LocalContext.current
+    val diagnosticResults = remember(context) { DiagnosticResults(context) }
     val latest = model.latest
     val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -76,8 +78,8 @@ fun SpectraApp(model: SpectraViewModel) {
         model.message?.let { snackbar.showSnackbar(it); model.clearMessage() }
     }
 
-    if (touchTestOpen) {
-        TouchTestScreen(onClose = { touchTestOpen = false })
+    if (diagnosticScreen != null) {
+        DiagnosticDetail(diagnosticScreen!!, diagnosticResults, onClose = { diagnosticScreen = null })
         return
     }
 
@@ -133,7 +135,7 @@ fun SpectraApp(model: SpectraViewModel) {
                 Page.SYSTEM -> SystemScreen(latest)
                 Page.THERMAL -> ThermalScreen(latest)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
-                Page.DIAGNOSTICS -> DiagnosticsScreen(onTouchTest = { touchTestOpen = true })
+                Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
             }
         }
     }
