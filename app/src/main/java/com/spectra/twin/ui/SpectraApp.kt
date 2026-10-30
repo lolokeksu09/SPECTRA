@@ -60,6 +60,9 @@ private enum class Page(val title: String, val navigationTitle: String = title) 
     DIAGNOSTICS("Проверки", "Тесты")
 }
 
+internal fun visibleTelemetry(snapshot: TelemetrySnapshot?, stale: Boolean): TelemetrySnapshot? =
+    if (stale) null else snapshot
+
 @Composable
 fun SpectraApp(model: SpectraViewModel) {
     var current by remember { mutableStateOf(Page.TWIN) }
@@ -75,6 +78,7 @@ fun SpectraApp(model: SpectraViewModel) {
     var returnToTwin by remember { mutableStateOf(false) }
     var capabilities by remember { mutableStateOf<DeviceCapabilities?>(null) }
     val latest = model.latest
+    val currentTelemetry = visibleTelemetry(latest, model.telemetryStale)
     val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -168,8 +172,8 @@ fun SpectraApp(model: SpectraViewModel) {
                     onDiagnostic = { diagnosticScreen = it }, onPassport = { focus ->
                         passportFocus = focus; passportOpen = true
                     })
-                Page.SYSTEM -> SystemScreen(latest, onPassport = { passportFocus = PassportFocus.ALL; passportOpen = true })
-                Page.THERMAL -> ThermalScreen(latest)
+                Page.SYSTEM -> SystemScreen(currentTelemetry, onPassport = { passportFocus = PassportFocus.ALL; passportOpen = true })
+                Page.THERMAL -> ThermalScreen(currentTelemetry)
                 Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
                 Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
             }
@@ -216,6 +220,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     var selectedPart by selectedPartState
     var showParts by remember { mutableStateOf(false) }
     var focusRequest by focusRequestState
+    val currentTelemetry = visibleTelemetry(latest, telemetryStale)
     val scope = rememberCoroutineScope()
     fun closePart() {
         selectedPart = null
@@ -478,17 +483,17 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
         }
         StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                HeroMetric("БАТАРЕЯ", Metrics.percentLabel(latest?.batteryPercent),
+                HeroMetric("БАТАРЕЯ", Metrics.percentLabel(currentTelemetry?.batteryPercent),
                     Icons.Filled.BatteryFull, Modifier.weight(1f))
-                HeroMetric("ТЕМПЕРАТУРА", Metrics.temperature(latest?.batteryCelsius),
+                HeroMetric("ТЕМПЕРАТУРА", Metrics.temperature(currentTelemetry?.batteryCelsius),
                     Icons.Filled.Thermostat, Modifier.weight(1f))
             }
         }
         StableTwinItem {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                HeroMetric("RAM ЗАНЯТО", Metrics.percentLabel(Metrics.percent(latest?.memoryAvailableBytes,
-                    latest?.memoryTotalBytes)), Icons.Filled.Memory, Modifier.weight(1f))
-                HeroMetric("ТЕПЛОВОЙ СТАТУС", Metrics.thermalStatus(latest?.thermalStatus),
+                HeroMetric("RAM ЗАНЯТО", Metrics.percentLabel(Metrics.percent(currentTelemetry?.memoryAvailableBytes,
+                    currentTelemetry?.memoryTotalBytes)), Icons.Filled.Memory, Modifier.weight(1f))
+                HeroMetric("ТЕПЛОВОЙ СТАТУС", Metrics.thermalStatus(currentTelemetry?.thermalStatus),
                     Icons.Filled.DeviceThermostat, Modifier.weight(1f), compact = true)
             }
         }
@@ -653,14 +658,13 @@ private fun SystemScreen(latest: TelemetrySnapshot?, onPassport: () -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionTitle("Системная телеметрия", "Обновление примерно каждые 2,5 секунды во время просмотра") }
-        item { OutlinedButton(onClick = onPassport, modifier = Modifier.fillMaxWidth()) { Text("Паспорт устройства") } }
         item {
             PanelCard {
                 Text("АККУМУЛЯТОР", color = Ice, style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(6.dp))
                 DataRow("Заряд", Metrics.percentLabel(latest?.batteryPercent))
                 DataRow("Состояние", latest?.batteryHealth ?: "Недоступно")
-                DataRow("Зарядка", when (latest?.isCharging) { true -> "Подключена"; false -> "Не заряжается"; null -> "Недоступно" })
+                DataRow("Зарядка", when (latest?.isCharging) { true -> "Заряжается или батарея полная"; false -> "Не заряжается"; null -> "Недоступно" })
                 DataRow("Температура батареи", Metrics.temperature(latest?.batteryCelsius))
                 DataRow("Напряжение", Metrics.voltage(latest?.batteryVoltageMv))
                 DataRow("Ток батареи", Metrics.current(latest?.batteryCurrentMa), "Знак тока зависит от реализации прошивки")
@@ -678,6 +682,7 @@ private fun SystemScreen(latest: TelemetrySnapshot?, onPassport: () -> Unit) {
                 DataRow("Частота дисплея", Metrics.hz(latest?.refreshRateHz), "Не равна частоте кадров в игре")
             }
         }
+        item { OutlinedButton(onClick = onPassport, modifier = Modifier.fillMaxWidth()) { Text("Паспорт устройства") } }
         item { Caption("Не показываем CPU/GPU температуру и FPS других приложений: обычные Android API не гарантируют эти данные. Свободная RAM учитывает системные кэши.") }
     }
 }
