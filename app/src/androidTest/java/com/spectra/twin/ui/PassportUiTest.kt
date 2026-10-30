@@ -24,6 +24,35 @@ import java.io.File
 class PassportUiTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun currentInformationComesBeforeSaving() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val folder = File(context.cacheDir, "passport-overview-${System.nanoTime()}").apply { mkdirs() }
+        val isolated = object : ContextWrapper(context) { override fun getFilesDir(): File = folder }
+        val name = "passport-overview-prefs-${System.nanoTime()}"
+        try {
+            compose.setContent { SpectraTheme {
+                PassportScreen(DeviceCapabilities(emptyList(), emptyList(), emptyList()),
+                    DiagnosticResults(context, name), storeOverride = PassportStore(isolated), onClose = {})
+            } }
+            compose.onNodeWithTag("passport-current").assertIsDisplayed()
+            val current = compose.onNodeWithTag("passport-current").fetchSemanticsNode().boundsInRoot
+            val save = compose.onNodeWithTag("save-passport").fetchSemanticsNode().boundsInRoot
+            assertTrue(current.top < save.top)
+            val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, "passport-overview.png")
+                put(MediaStore.Downloads.MIME_TYPE, "image/png")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SPECTRA-passport-ui/")
+            }
+            val uri = requireNotNull(context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
+            requireNotNull(context.contentResolver.openOutputStream(uri)).use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            bitmap.recycle()
+        } finally {
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+            folder.deleteRecursively()
+        }
+    }
+
     @Test fun compareSelectedSavedPassportsAndSaveNewOne() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val folder = File(context.cacheDir, "passport-ui-${System.nanoTime()}").apply { mkdirs() }
@@ -113,3 +142,4 @@ class PassportUiTest {
         }
     }
 }
+
