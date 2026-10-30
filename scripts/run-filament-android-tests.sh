@@ -40,6 +40,8 @@ assert (root / 'android-load-metrics.json').is_file()
 print('All 18 black Android Filament screenshots and load metrics recovered')
 PY_BLACK
     [ "$?" -eq 0 ] || exit 1
+    adb pull /sdcard/Download/SPECTRA-part-ui build/model-evidence/part-ui || exit 1
+    test -s build/model-evidence/part-ui/external-part-card.png || exit 1
 else
     adb pull /sdcard/Download/SPECTRA-v24 build/model-evidence/filament || true
     adb pull /sdcard/Download/SPECTRA-black-v3 build/model-evidence/filament-black || true
