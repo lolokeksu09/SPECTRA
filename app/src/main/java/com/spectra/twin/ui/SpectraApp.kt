@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.spectra.twin.render.FilamentDeviceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
@@ -55,14 +57,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class Page(val title: String, val navigationTitle: String = title) {
+internal enum class Page(val title: String, val navigationTitle: String = title) {
     TWIN("3D-модель", "3D"), SYSTEM("Система"), THERMAL("Тепло"), HISTORY("История"),
     DIAGNOSTICS("Проверки", "Тесты")
 }
 
 @Composable
 fun SpectraApp(model: SpectraViewModel) {
-    var current by remember { mutableStateOf(Page.TWIN) }
+    var current by rememberSaveable { mutableStateOf(Page.TWIN) }
     var diagnosticScreen by remember { mutableStateOf<DiagnosticKind?>(null) }
     val selectedPartState = remember { mutableStateOf<ExternalPart?>(null) }
     val viewSideState = remember { mutableStateOf(DeviceView.REAR) }
@@ -75,6 +77,9 @@ fun SpectraApp(model: SpectraViewModel) {
     var returnToTwin by remember { mutableStateOf(false) }
     var capabilities by remember { mutableStateOf<DeviceCapabilities?>(null) }
     val latest = model.latest
+    val configuration = LocalConfiguration.current
+    val useRail = useNavigationRail(configuration.screenWidthDp, configuration.screenHeightDp)
+    val showRailLabels = configuration.screenHeightDp >= 600
     val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -118,60 +123,50 @@ fun SpectraApp(model: SpectraViewModel) {
         containerColor = Night,
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            NavigationBar(containerColor = Panel, tonalElevation = 0.dp) {
-                Page.entries.forEach { page ->
-                    val icon = when (page) {
-                        Page.TWIN -> Icons.Filled.ViewInAr
-                        Page.SYSTEM -> Icons.Filled.Memory
-                        Page.THERMAL -> Icons.Filled.Thermostat
-                        Page.HISTORY -> Icons.Filled.History
-                        Page.DIAGNOSTICS -> Icons.Filled.TouchApp
-                    }
-                    NavigationBarItem(
-                        selected = current == page,
-                        onClick = { current = page; returnToTwin = false },
-                        label = { Text(page.navigationTitle, maxLines = 1) },
-                        icon = { Icon(icon, contentDescription = page.title) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Night,
-                            selectedTextColor = Ice,
-                            indicatorColor = Ice,
-                            unselectedIconColor = Muted,
-                            unselectedTextColor = Muted
-                        )
-                    )
+            if (!useRail) {
+                NavigationMenu(current, useRail = false, showRailLabels = true) { page ->
+                    current = page
+                    returnToTwin = false
                 }
             }
         },
         contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            Header(latest?.deviceName ?: "Android", current.title)
-            if (current != Page.HISTORY && current != Page.DIAGNOSTICS) {
-                val stamp = latest?.let { SimpleDateFormat("HH:mm:ss", Locale("ru")).format(Date(it.atMillis)) }
-                val state = when {
-                    model.telemetryStale && stamp != null -> "Данные устарели · последнее обновление $stamp"
-                    model.telemetryStale -> "Ожидание данных Android"
-                    else -> "Обновлено: $stamp"
+        Row(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            if (useRail) {
+                NavigationMenu(current, useRail = true, showRailLabels = showRailLabels) { page ->
+                    current = page
+                    returnToTwin = false
                 }
-                Text(state, color = if (model.telemetryStale) Color(0xFFFFBEBE) else Muted,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
             }
-            when (current) {
-                Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
-                    model.importedModelUri, model::importModelUri,
-                    model.blackModelUri, model::importBlackModelUri,
-                    model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
-                    capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState, twinScroll,
-                    onBattery = { returnToTwin = true; current = Page.SYSTEM },
-                    onDiagnostic = { diagnosticScreen = it }, onPassport = { focus ->
-                        passportFocus = focus; passportOpen = true
-                    })
-                Page.SYSTEM -> SystemScreen(latest, onPassport = { passportFocus = PassportFocus.ALL; passportOpen = true })
-                Page.THERMAL -> ThermalScreen(latest)
-                Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
-                Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                Header(latest?.deviceName ?: "Android", current.title)
+                if (current != Page.HISTORY && current != Page.DIAGNOSTICS) {
+                    val stamp = latest?.let { SimpleDateFormat("HH:mm:ss", Locale("ru")).format(Date(it.atMillis)) }
+                    val state = when {
+                        model.telemetryStale && stamp != null -> "Данные устарели · последнее обновление $stamp"
+                        model.telemetryStale -> "Ожидание данных Android"
+                        else -> "Обновлено: $stamp"
+                    }
+                    Text(state, color = if (model.telemetryStale) Color(0xFFFFBEBE) else Muted,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp))
+                }
+                when (current) {
+                    Page.TWIN -> TwinScreen(latest, model.finish, model::selectFinish,
+                        model.importedModelUri, model::importModelUri,
+                        model.blackModelUri, model::importBlackModelUri,
+                        model::restoreBundledModel, model::snapshot, model.telemetryStale, model::reportImportPermissionError,
+                        capabilities, diagnosticResults, selectedPartState, viewSideState, focusRequestState, twinScroll,
+                        onBattery = { returnToTwin = true; current = Page.SYSTEM },
+                        onDiagnostic = { diagnosticScreen = it }, onPassport = { focus ->
+                            passportFocus = focus; passportOpen = true
+                        })
+                    Page.SYSTEM -> SystemScreen(latest, onPassport = { passportFocus = PassportFocus.ALL; passportOpen = true })
+                    Page.THERMAL -> ThermalScreen(latest)
+                    Page.HISTORY -> HistoryScreen(model.history, model.historyLoading, model.historyError, model::reloadHistory)
+                    Page.DIAGNOSTICS -> DiagnosticsScreen(diagnosticResults, onOpen = { diagnosticScreen = it })
+                }
             }
         }
     }
@@ -196,6 +191,79 @@ internal fun Header(device: String, title: String) {
                 modifier = Modifier.testTag("header-device"))
             Text("ANDROID ${Build.VERSION.RELEASE}", color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+internal fun useNavigationRail(widthDp: Int, heightDp: Int): Boolean =
+    widthDp >= 600 && heightDp >= 480
+
+internal fun twinPreviewHeightDp(heightDp: Int, selectedPart: Boolean): Int =
+    if (heightDp < 500) {
+        if (selectedPart) 220 else 290
+    } else {
+        if (selectedPart) 260 else 425
+    }
+
+private fun Page.navigationIcon() = when (this) {
+    Page.TWIN -> Icons.Filled.ViewInAr
+    Page.SYSTEM -> Icons.Filled.Memory
+    Page.THERMAL -> Icons.Filled.Thermostat
+    Page.HISTORY -> Icons.Filled.History
+    Page.DIAGNOSTICS -> Icons.Filled.TouchApp
+}
+
+@Composable
+internal fun NavigationMenu(
+    selected: Page,
+    useRail: Boolean,
+    showRailLabels: Boolean,
+    onSelect: (Page) -> Unit
+) {
+    if (useRail) {
+        NavigationRail(
+            modifier = Modifier.fillMaxHeight().testTag("navigation-rail"),
+            containerColor = Panel
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Page.entries.forEach { page ->
+                NavigationRailItem(
+                    selected = selected == page,
+                    onClick = { onSelect(page) },
+                    icon = { Icon(page.navigationIcon(), contentDescription = null) },
+                    label = { Text(page.navigationTitle, maxLines = 1) },
+                    alwaysShowLabel = showRailLabels,
+                    modifier = Modifier.testTag("nav-" + page.name.lowercase(Locale.ROOT))
+                        .semantics { contentDescription = page.title },
+                    colors = NavigationRailItemDefaults.colors(
+                        selectedIconColor = Night,
+                        selectedTextColor = Ice,
+                        indicatorColor = Ice,
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
+                    )
+                )
+            }
+        }
+    } else {
+        NavigationBar(modifier = Modifier.testTag("navigation-bar"), containerColor = Panel, tonalElevation = 0.dp) {
+            Page.entries.forEach { page ->
+                NavigationBarItem(
+                    selected = selected == page,
+                    onClick = { onSelect(page) },
+                    icon = { Icon(page.navigationIcon(), contentDescription = null) },
+                    label = { Text(page.navigationTitle, maxLines = 1) },
+                    modifier = Modifier.testTag("nav-" + page.name.lowercase(Locale.ROOT))
+                        .semantics { contentDescription = page.title },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Night,
+                        selectedTextColor = Ice,
+                        indicatorColor = Ice,
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
+                    )
+                )
+            }
         }
     }
 }
@@ -277,7 +345,7 @@ private fun TwinScreen(latest: TelemetrySnapshot?, finish: DeviceFinish,
     ) {
         StableTwinItem {
             Box(
-                modifier = Modifier.fillMaxWidth().height(if (selectedPart != null) 260.dp else 425.dp)
+                modifier = Modifier.fillMaxWidth().height(twinPreviewHeightDp(LocalConfiguration.current.screenHeightDp, selectedPart != null).dp)
                     .clip(RoundedCornerShape(24.dp)).background(Panel)
             ) {
                 val activeUri = if (finish == DeviceFinish.WHITE) importedModelUri else blackModelUri
